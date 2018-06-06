@@ -1,0 +1,11 @@
+eclipse.preferences.version=1
+environment/project/nbeclipse.toolchain.nbde.debug.912502264/PATH/delimiter=;
+environment/project/nbeclipse.toolchain.nbde.debug.912502264/PATH/operation=prepend
+environment/project/nbeclipse.toolchain.nbde.debug.912502264/PATH/value=C\:\\Nburn\\gcc-m68k\\bin;C\:\\Nburn\\pcbin;C\:\\Nburn\\gcc-m68k\\msys\\1.0\\bin
+environment/project/nbeclipse.toolchain.nbde.debug.912502264/append=true
+environment/project/nbeclipse.toolchain.nbde.debug.912502264/appendContributed=true
+environment/project/nbeclipse.toolchain.nbde.rel.1376788858/PATH/delimiter=;
+environment/project/nbeclipse.toolchain.nbde.rel.1376788858/PATH/operation=prepend
+environment/project/nbeclipse.toolchain.nbde.rel.1376788858/PATH/value=C\:\\Nburn\\gcc-m68k\\bin;C\:\\Nburn\\pcbin;C\:\\Nburn\\gcc-m68k\\msys\\1.0\\bin
+environment/project/nbeclipse.toolchain.nbde.rel.1376788858/append=true
+environment/project/nbeclipse.toolchain.nbde.rel.1376788858/appendContributed=true
