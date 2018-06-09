@@ -17,8 +17,9 @@
 #include "tests.h"
 #include "Utility.h"
 #include "Drivers/Odometer.h"
-#include "Drivers/IMU.h"
+#include "Drivers/IMUSetupAndSample.h"
 #include <multichanneli2c.h>
+#include "Drivers/MPU9250.h"
 
 extern "C" {
 void UserMain(void * pd);
@@ -31,7 +32,7 @@ void UserMain(void * pd);
 OS_SEM MainTaskSem; //Semaphore: the function that has this gets to run
 LCD lcd; //LCD object, reinstantiated in init()
 Odometer odo; //Global odometer object, reinstantiated in init()
-IMU imu;
+MPU9250 imu;
 
 // ---Code for Odometer---
 
@@ -58,8 +59,11 @@ void init() {
 	//IMU
 	Pins[27].function(PIN_27_I2C0_SCL    );//I2C for IMU
 	Pins[29].function(PIN_29_I2C0_SDA    );//I2C For IMU
+	Pins[50].hiz();
 	Pins[50].function(PIN_50_IRQ2  ); //IRQ for IMU
-	imu = IMU(0x68, MAIN_PRIO-4); //the MPU-9250 IMU has I2C address 0x68
+	//imu = IMU(0x68, MAIN_PRIO-4); //the MPU-9250 IMU has I2C address 0x68
+	imu = MPU9250(50);
+	IMUSetup();
 
 	//LIDAR
 	Pins[13].function(PIN_13_UART2_RXD);	//LIDAR RX
@@ -95,11 +99,10 @@ void UserMain(void * pd) {
     init();
 
     SetServoPos(1,0);    //Ensure that Electronic Speed Controller
+    IMURun();
 	OSTimeDly(TICKS_PER_SECOND*5);  //reads a stall for five seconds
-	iprintf("Initialized throttle\n");
 
     while (1) {
-    	imu.printRaw();
     	OSTimeDly(TICKS_PER_SECOND);
     }
 }

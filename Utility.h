@@ -13,6 +13,7 @@ namespace Utility {
 	void countdown(int secs, int x, int y);
 	int inchesToOdo(int inches);
 	int I2CScan(bool *discovered);
+	float degreeWrap(float deg); //returns a degree val between -180 and 180
 }
 
 

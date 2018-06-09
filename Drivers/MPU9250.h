@@ -1,30 +1,31 @@
-/*
- * IMUDefs.h
- *
- *  Created on: Jun 5, 2018
- *      Author: NetBurner
- */
+/*  Driver for MPU9250
+ *  Created by Kris Winer ; Ported to Netburner 2.8/3.0 by David Linn
+ *  Can be ported to other platforms by switching out timing/delay I2C communication functions
+ Demonstrate basic MPU-9250 functionality including parameterizing the register addresses, initializing the sensor, 
+ getting properly scaled accelerometer, gyroscope, and magnetometer data out.
+ 
+ Library may be used freely and without limit with attribution.
+*/
+  
+#ifndef MPU9250_h
+#define MPU9250_h
+#include <basictypes.h>
+#include <HiResTimer.h>
 
-#ifndef IMUDEFS_H_
-#define IMUDEFS_H_
-
-#define I2CPORT 0
-#define WHO_AM_I_REGISTER 0x75
-
-// See also MPU-9250 Register Map and Descriptions, Revision 4.0, RM-MPU-9250A-00, Rev. 1.4, 9/9/2013 for registers not listed in
+// See also MPU-9250 Register Map and Descriptions, Revision 4.0, RM-MPU-9250A-00, Rev. 1.4, 9/9/2013 for registers not listed in 
 // above document; the MPU9250 and MPU9150 are virtually identical but the latter has a different register map
 //
 //Magnetometer Registers
 #define AK8963_ADDRESS   0x0C
-#define AK8963_WHO_AM_I  0x00 // should return 0x48
-#define AK8963_INFO      0x01
+#define WHO_AM_I_AK8963  0x00 // should return 0x48
+#define INFO             0x01
 #define AK8963_ST1       0x02  // data ready status bit 0
-#define AK8963_XOUT_L	 0x03  // data
-#define AK8963_XOUT_H	 0x04
-#define AK8963_YOUT_L	 0x05
-#define AK8963_YOUT_H	 0x06
-#define AK8963_ZOUT_L	 0x07
-#define AK8963_ZOUT_H	 0x08
+#define AK8963_XOUT_L     0x03  // data
+#define AK8963_XOUT_H    0x04
+#define AK8963_YOUT_L    0x05
+#define AK8963_YOUT_H    0x06
+#define AK8963_ZOUT_L    0x07
+#define AK8963_ZOUT_H    0x08
 #define AK8963_ST2       0x09  // Data overflow bit 3 and data read error status bit 2
 #define AK8963_CNTL      0x0A  // Power down (0000), single-measurement (0001), self-test (1000) and Fuse ROM (1111) modes on bits 3:0
 #define AK8963_ASTC      0x0C  // Self test control
@@ -33,13 +34,22 @@
 #define AK8963_ASAY      0x11  // Fuse ROM y-axis sensitivity adjustment value
 #define AK8963_ASAZ      0x12  // Fuse ROM z-axis sensitivity adjustment value
 
-#define SELF_TEST_X_GYRO 0x00
-#define SELF_TEST_Y_GYRO 0x01
+#define SELF_TEST_X_GYRO 0x00                  
+#define SELF_TEST_Y_GYRO 0x01                                                                          
 #define SELF_TEST_Z_GYRO 0x02
 
+/*#define X_FINE_GAIN      0x03 // [7:0] fine gain
+#define Y_FINE_GAIN      0x04
+#define Z_FINE_GAIN      0x05
+#define XA_OFFSET_H      0x06 // User-defined trim values for accelerometer
+#define XA_OFFSET_L_TC   0x07
+#define YA_OFFSET_H      0x08
+#define YA_OFFSET_L_TC   0x09
+#define ZA_OFFSET_H      0x0A
+#define ZA_OFFSET_L_TC   0x0B */
 
 #define SELF_TEST_X_ACCEL 0x0D
-#define SELF_TEST_Y_ACCEL 0x0E
+#define SELF_TEST_Y_ACCEL 0x0E    
 #define SELF_TEST_Z_ACCEL 0x0F
 
 #define SELF_TEST_A      0x10
@@ -55,15 +65,15 @@
 #define GYRO_CONFIG      0x1B
 #define ACCEL_CONFIG     0x1C
 #define ACCEL_CONFIG2    0x1D
-#define LP_ACCEL_ODR     0x1E
-#define WOM_THR          0x1F
+#define LP_ACCEL_ODR     0x1E   
+#define WOM_THR          0x1F   
 
 #define MOT_DUR          0x20  // Duration counter threshold for motion interrupt generation, 1 kHz rate, LSB = 1 ms
 #define ZMOT_THR         0x21  // Zero-motion detection threshold bits [7:0]
 #define ZRMOT_DUR        0x22  // Duration counter threshold for zero motion interrupt generation, 16 Hz rate, LSB = 64 ms
 
 #define FIFO_EN          0x23
-#define I2C_MST_CTRL     0x24
+#define I2C_MST_CTRL     0x24   
 #define I2C_SLV0_ADDR    0x25
 #define I2C_SLV0_REG     0x26
 #define I2C_SLV0_CTRL    0x27
@@ -139,7 +149,7 @@
 #define DMP_RW_PNT       0x6E  // Set read/write pointer to a specific start address in specified DMP bank
 #define DMP_REG          0x6F  // Register in DMP from which to read or to which to write
 #define DMP_REG_1        0x70
-#define DMP_REG_2        0x71
+#define DMP_REG_2        0x71 
 #define FIFO_COUNTH      0x72
 #define FIFO_COUNTL      0x73
 #define FIFO_R_W         0x74
@@ -151,46 +161,77 @@
 #define ZA_OFFSET_H      0x7D
 #define ZA_OFFSET_L      0x7E
 
-#define MPU9250_ADDRESS 0x68  // Device address when ADO = 0
-#define AK8963_ADDRESS 0x0C   //  Address of magnetometer
-
-// These are the values the NetBurner I2C functions will return
-#define I2C_OK             ( 0 )  // Last instruction terminated correctly
-#define I2C_NEXT_WRITE_OK  ( 1 )  // I2C bus is OK for a write
-#define I2C_NEXT_READ_OK   ( 2 )  // I2C bus is OK for a read
-#define I2C_MASTER_OK      ( 3 )  // I2C finished transmission but still owns but (need to stop or restart)
-#define I2C_TIMEOUT        ( 4 )  // A timeout occured while trying communicate on I2C bus
-#define I2C_BUS_NOT_AVAIL  ( 5 )  // A timeout occured while trying gain I2C bus control
-#define I2C_NOT_READY      ( 6 )  // A read or write was attempted before I2C ready or during a slave transmission
-#define I2C_LOST_ARB       ( 7 )  // Lost arbitration during start
-#define I2C_LOST_ARB_ADD   ( 8 )  // Lost arbitration and then winner addressed our slave address
-#define I2C_NO_LINK_RX_ACK ( 9 )  // We are in Master TX mode and recieved no ACK from slave device, possibly during start
-
 // Set initial input parameters
-enum Ascale {
-  AFS_2G = 0,
-  AFS_4G,
-  AFS_8G,
-  AFS_16G
+#define  AFS2G 0
+#define  AFS4G  1
+#define  AFS8G  2
+#define  AFS16G 3
+
+#define  GFS250DPS  0
+#define  GFS500DPS  1
+#define  GFS1000DPS 2
+#define  GFS2000DPS 3
+
+#define  MFS14BITS  0 // 0.6 mG per LSB
+#define  MFS16BITS  1    // 0.15 mG per LSB
+
+#define M8Hz   0x02
+#define M100Hz 0x06
+
+// Define I2C addresses of MPU9250
+#define ADO 0
+#if ADO
+#define MPU9250_ADDRESS 0x69   // Device address when ADO = 1
+#define AK8963_ADDRESS  0x0C   //  Address of magnetometer
+#else
+#define MPU9250_ADDRESS 0x68   // Device address when ADO = 0
+#define AK8963_ADDRESS  0x0C   //  Address of magnetometer
+#endif  
+
+
+class MPU9250
+{
+  public: 
+  MPU9250(uint8_t intPin);
+  MPU9250();
+  uint8_t getMPU9250ID();
+  uint8_t getAK8963CID();
+  void resetMPU9250();
+  void initMPU9250(uint8_t Ascale,uint8_t Gscale);
+  void initAK8963(uint8_t Mscale, uint8_t Mmode, float * destination);
+  float getAres(uint8_t Ascale);
+  float getGres(uint8_t Gscale);
+  float getMres(uint8_t Mscale);
+  void magcalMPU9250(float * dest1, float * dest2);
+  void calibrateMPU9250(float * dest1, float * dest2);
+  void SelfTest(float * destination);
+  void readMPU9250Data(int16_t * destination);
+  void readAccelData(int16_t * destination);
+  void readGyroData(int16_t * destination);
+  bool checkNewAccelGyroData();
+  bool checkNewMagData();
+  void readMagData(int16_t * destination);
+  int16_t readGyroTempData();
+  void gyromagSleep();
+  void gyromagWake(uint8_t Mmode);
+  void accelWakeOnMotion();
+  bool checkWakeOnMotion();
+//  void MadgwickQuaternionUpdate(float ax, float ay, float az, float gx, float gy, float gz, float mx, float my, float mz);
+  uint8_t I2CWriteReadBuffer(uint8_t address, uint8_t writeVal, uint8_t *buffer, int readLength);
+  void    writeByte(uint8_t address, uint8_t subAddress, uint8_t data);
+  uint8_t readByte(uint8_t address, uint8_t subAddress);
+  void    readBytes(uint8_t address, uint8_t subAddress, uint8_t count, uint8_t * dest);
+  private:
+  uint8_t _intPin;  
+  float _aRes;
+  float _gRes;
+  float _mRes;
+  uint8_t _Mmode;
+  float _fuseROMx;
+  float _fuseROMy;
+  float _fuseROMz;
+  float _magCalibration[3];
+  HiResTimer* timer;
 };
 
-enum Gscale {
-  GFS_250DPS = 0,
-  GFS_500DPS,
-  GFS_1000DPS,
-  GFS_2000DPS
-};
-
-enum Mscale {
-  MFS_14BITS = 0, // 0.6 mG per LSB
-  MFS_16BITS      // 0.15 mG per LSB
-};
-
-// Specify sensor full scale
-uint8_t Gscale = GFS_250DPS;
-uint8_t Ascale = AFS_2G;
-uint8_t Mscale = MFS_16BITS; // Choose either 14-bit or 16-bit magnetometer resolution
-uint8_t Mmode = 0x02;        // 2 for 8 Hz, 6 for 100 Hz continuous magnetometer data read
-
-
-#endif /* IMUDEFS_H_ */
+#endif
