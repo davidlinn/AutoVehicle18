@@ -26,6 +26,8 @@
 //---Note: some pins and constants are hardcoded
 void IMUSetup();
 void IMURun();
+float getHeading();
+float* getQuaternion();
 
 //Methods designed to be called from IMUSetup() and IMURun()
 void IMUSampleLoop(void*);

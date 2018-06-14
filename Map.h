@@ -24,6 +24,7 @@ public:
 		double estimateCount; //num times this feature has been estimated
 	};
 	std::vector<Feature> featureList;
+
 };
 
 #endif /* MAP_H_ */

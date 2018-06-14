@@ -29,6 +29,8 @@
 #include "Math.h"
 #include "MPU9250.h"
 #include "MadgwickFilter.h"
+#include "VehDefs.h"
+#include "LCD.h"
 
 #define SerialDebug 1
 #define CALIBGA 1 //set to 1 to recalibrate gyro and accelerometer
@@ -76,9 +78,7 @@ float zeta = sqrt(3.0f / 4.0f) * GyroMeasDrift;   // compute zeta, the other fre
 double delt_t = 0, count = 0, sumCount = 0;  // used to control display output rate
 float pitch, yaw, roll, heading;
 float a12, a22, a31, a32, a33;            // rotation matrix coefficients for Euler angles and gravity components
-double deltat = 0.0f, sum = 0.0f;          // integration interval for both filter schemes
-HiResTimer* filtertimer = HiResTimer::getHiResTimer();
-HiResTimer* displaytimer = HiResTimer::getHiResTimer();
+double deltat, sum;          // integration interval for both filter schemes
 
 float ax, ay, az, gx, gy, gz, mx, my, mz; // variables to hold latest sensor data values 
 float lin_ax, lin_ay, lin_az;             // linear acceleration (acceleration with gravity component subtracted)
@@ -86,6 +86,7 @@ float q[4] = {1.0f, 0.0f, 0.0f, 0.0f};    // vector to hold quaternion
 float eInt[3] = {0.0f, 0.0f, 0.0f};       // vector to hold integral error for Mahony method
 
 extern MPU9250 imu; //Make sure global imu object gets initialized in main.cpp's init()
+extern LCD lcd;
 
 int whoAmICheck();
 void IMUSetup()
@@ -108,7 +109,10 @@ void IMUSetup()
   // Get magnetometer calibration from AK8963 ROM
   imu.initAK8963(Mscale,Mmode,magCalibration); printf("\nAK8963 initialized for active data mode...."); // Initialize device for active mode read of magnetometer
   if (CALIBMAG) {
+	  lcd.clear();
+	  lcd.print("Calib Mag...");
 	  imu.magcalMPU9250(magBias, magScale);
+	  lcd.clear();
 	  printf("\nAK8963 mag biases (mG)"); printf(" %f",magBias[0]); printf(" %f",magBias[1]); printf(" %f",magBias[2]);
 	  printf("\nAK8963 mag scale (mG)"); printf(" %f",magScale[0]); printf(" %f",magScale[1]); printf(" %f",magScale[2]);
 	  OSTimeDly(TICKS_PER_SECOND*2); // add delay to see results before serial spew of data
@@ -119,8 +123,8 @@ void IMUSetup()
 	  printf("\nZ-Axis sensitivity adjustment value "); printf("%f\n",magCalibration[2]);
   }
   OSTimeDly(TICKS_PER_SECOND);
+  HiResTimer* filtertimer = HiResTimer::getHiResTimer(IMU_TIMER);
   filtertimer->init();
-  displaytimer->init();
 }
 
 void CalibAccAndGyro() {
@@ -137,7 +141,7 @@ void CalibAccAndGyro() {
 	imu.calibrateMPU9250(gyroBias, accelBias); // Calibrate gyro and accelerometers, load biases in bias registers
 	printf("\naccel biases (mg)"); printf(" %f",1000.*accelBias[0]); printf(" %f",1000.*accelBias[1]); printf(" %f",1000.*accelBias[2]);
 	printf("\ngyro biases (dps)"); printf(" %f",gyroBias[0]); printf(" %f",gyroBias[1]); printf(" %f",gyroBias[2]);
-	OSTimeDly(TICKS_PER_SECOND);
+	//OSTimeDly(TICKS_PER_SECOND);
 }
 
 //-----Task Management----
@@ -152,9 +156,8 @@ PirqCount++;
 
 void IMUSampleLoop(void*)
 {  
-	//MPU9250 imu = (MPU9250) *imu;
+	HiResTimer* filtertimer = HiResTimer::getHiResTimer(IMU_TIMER);
 	filtertimer->start();
-	displaytimer->start();
 	while (1) {
 		PirqSem.Pend(); //Wait for a call to PirqSem.Post()
 	  // Interrupt pin just went high because there was new data to be read
@@ -189,7 +192,7 @@ void IMUSampleLoop(void*)
 	  filtertimer->start();
 
 	  sum += deltat; // sum for averaging filter update rate
-	  sumCount++;
+	  ++sumCount;
 
 	  // Sensors x (y)-axis of the accelerometer/gyro is aligned with the y (x)-axis of the magnetometer;
 	  // the magnetometer z-axis (+ down) is misaligned with z-axis (+ up) of accelerometer and gyro!
@@ -204,9 +207,7 @@ void IMUSampleLoop(void*)
 	//  if(passThru)MahonyQuaternionUpdate(-ax, ay, az, gx*PI/180.0f, -gy*PI/180.0f, -gz*PI/180.0f,  my,  -mx, mz);
 		// Serial print and/or display at 0.5 s rate independent of data rates
 		//delt_t = (filtertimer->readTime()/1000) - count;
-		if (displaytimer->readTime()>.5) { // update LCD once per half-second independent of read rate
-			displaytimer->stopClear(); //reset display timer
-			displaytimer->start();
+		if (sum>.5) { // update LCD once per half-second independent of read rate
 			if(SerialDebug) {
 				printf("\ngRes = %f",gRes);
 				printf("\nax = "); printf("%f",(int)1000*ax);
@@ -265,6 +266,10 @@ void IMUSampleLoop(void*)
 				printf("\nGrav_x, Grav_y, Grav_z: %f, %f, %f mg",-a31*1000,-a32*1000,a33*1000);
 				printf("\nLin_ax, Lin_ay, Lin_az: %f, %f, %f mg",lin_ax*1000,lin_ay*1000,lin_az*1000);
 				printf("\nrate = "); printf("%f",(float)sumCount/sum); printf(" Hz");
+				lcd.clear();
+				char buf[16];
+				sprintf(buf, "Heading: %f", heading);
+				lcd.print(buf,16);
 			}
 
 			// With these settings the filter is updating at a ~145 Hz rate using the Madgwick scheme and
@@ -278,9 +283,8 @@ void IMUSampleLoop(void*)
 			// stabilization control of a fast-moving robot or quadcopter. Compare to the update rate of 200 Hz
 			// produced by the on-board Digital Motion Processor of Invensense's MPU6050 6 DoF and MPU9150 9DoF sensors.
 			// The 3.3 V 8 MHz Pro Mini is doing pretty well!
-			count = filtertimer->readTime()/1000;
-			sumCount = 0;
-			sum = 0;
+			sumCount = 0; //incremented each filter update, reset here every half-second or so
+			sum = 0; //sum of time intervals between filter updates, reset here every half-second or so
 		}
 	}
 }
@@ -299,7 +303,7 @@ void unclodI2C() {
 	Pins[27].function(PIN_27_I2C0_SCL    );//I2C for IMU
 	Pins[29].function(PIN_29_I2C0_SDA    );//I2C For IMU
 	I2CResetPeripheral();
-	OSTimeDly(2);
+	OSTimeDly(5);
 	//val = readReg((unsigned char *)0x75);  // Read WHO_AM_I register for MPU-9250
 	uint8_t val = imu.readByte(0x68,0x75);
 	iprintf("Retry ID=%02X\r\n",(int)val);
@@ -324,8 +328,16 @@ int whoAmICheck() { //Returns 0 for successful initialization, -1 for fail
 
 
 void IMURun() {
-    OSSimpleTaskCreatewName(IMUSampleLoop,MAIN_PRIO-1,"IMU");
+    OSSimpleTaskCreatewName(IMUSampleLoop,IMU_PRIO,"IMU");
 	SetPinIrq(50, 1,Pirq);
-	Pins[50].function(PIN_50_IRQ2  ); //IRQ for IMU
+	Pins[50].function(PIN_50_IRQ2); //IRQ for IMU
     PirqSem.Post();
+}
+
+float getHeading() {
+	return heading;
+}
+
+float* getQuaternion() {
+	return q;
 }
