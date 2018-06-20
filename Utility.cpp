@@ -42,13 +42,13 @@ namespace Utility {
 		}
 	}
 
-	int inchesToOdo(int inches) {
-		//y = 4.6249x
-		return 4.6249*inches;
+	double inchesToOdo(double inches) {
+		return inches/4.6249;
 	}
 
-	int odoToInches(int odo) {
-		return odo/4.6249;
+	double odoToInches(uint32_t odo) {
+		//y = 4.6249x
+		return 4.6249*((double)odo);
 	}
 
 	/*

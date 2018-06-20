@@ -30,6 +30,7 @@ LOGFILEINFO;
 extern "C" {
 void UserMain(void * pd);
 }
+extern volatile bool bLog;
 
 //GLOBAL VARIABLES
 //Classes initialized with default constructor, set to do nothing.
@@ -41,14 +42,23 @@ Odometer odo; //Global odometer object, reinstantiated in init()
 MPU9250 imu; //Global imu object, reinstantiated in init()
 Nav nav;
 
-void motorValUpdate() {
-	//printf("\nRC Ch1: %lu, RC Ch2: %lu", rc_ch[1], rc_ch[2]);
-	SetServoPos(0,HiCon(rc_ch[1])); //Steer
-    //SetServoRaw(0,rc_ch[1]);
-	SetServoRaw(1,rc_ch[2]); //Throttle
+void InitTimer3()
+{
+	//SETUP_DMATIMER3_ISR(&LIDAR_ISR,2);
+	sim2.timer[3].txmr=0;
+	sim2.timer[3].ter=3;
+	sim2.timer[3].trr=0;
+	sim2.timer[3].tcr=0;
+	sim2.timer[3].tcn=0;
+	sim2.timer[3].ter=3;
+	sim2.timer[3].tmr=0x0043;   // 0000 0000 01 0 0 0 0 1 1 //Rising edge
+//bLIDAR_MODE=1;
 }
 
 void init() {
+	//Timer 3- Global Timer
+	InitTimer3();
+
 	//Display
 	Pins[38].function(PIN_38_UART5_TXD); //TX to Serial LCD
 	lcd = LCD(5,9600); //Reinstantiates global lcd on serial port 5 w/ baud rate 9600
@@ -90,6 +100,25 @@ void init() {
 	SetServoPos(1,0);    //Ensure that Electronic Speed Controller reads a stall for five seconds
 }
 
+void LCDUpdate(void*) {
+	while (1) {
+		lcd.clear();
+		char buf[32];
+		sprintf(buf,"Head:%4.0f Odo:%3lu X:%4.0f Y:%4.0f",getHeading(),odo.getCount(),nav.getX(),nav.getY());
+		lcd.print(buf,32);
+		OSTimeDly(TICKS_PER_SECOND/2); //delay .5s
+	}
+}
+
+void Drive(void*) {
+	while (1) {
+		SetServoPos(0,HiCon(rc_ch[1])); //Steer
+		SetServoRaw(1,rc_ch[2]); //Throttle
+		nav.navUpdate();
+		OSTimeDly(TICKS_PER_SECOND/10);
+	}
+}
+
 const char * AppName="AutoVeh18";
 
 void UserMain(void * pd) {
@@ -112,11 +141,14 @@ void UserMain(void * pd) {
     iprintf("Application started\n");
     init();
     IMURun();
+    bLog = true;
+    Logger::logBegin();
 
-    HiResTimer* motorValUpdateTimer = HiResTimer::getHiResTimer(UPDATE_TIMER);
-    motorValUpdateTimer->init(.02);
-    motorValUpdateTimer->setInterruptFunction(motorValUpdate);
-    motorValUpdateTimer->start();
+    //LCD Update Task
+    OSSimpleTaskCreatewName(LCDUpdate,LCD_PRIO,"LCD Update");
+
+    //Servo Vals Update Task
+    OSSimpleTaskCreatewName(Drive,DRIVE_PRIO,"Drive");
 
     while (1) {
     	OSTimeDly(TICKS_PER_SECOND);

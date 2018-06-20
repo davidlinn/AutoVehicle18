@@ -10,10 +10,13 @@
 #include <stdio.h>
 #include <basictypes.h>
 #include <sim5441X.h>
+#include "Nav.h"
 
 static volatile uint32_t OdoCount;
 static volatile uint32_t DtOdoCount;
 static volatile uint32_t LastOdoTime;
+
+extern Nav nav;
 
 Odometer::Odometer()
 {
@@ -53,6 +56,8 @@ void Odometer::OdoIrq() {
 	}
 	DtOdoCount=dt;
 	LastOdoTime=t;
+
+	//nav.navUpdate();
 
 	//MainTaskSem.Post();
 }

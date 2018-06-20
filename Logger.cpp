@@ -42,9 +42,9 @@ void Logger::logLoop(void*) {
 	while (1) {
 		if (rc_ch[4]>1000) { //if Log is switched on
 			USER_ENTER_CRITICAL()
-			mainLog.steering=getServoPos(0);;
-			mainLog.throttle=getServoPos(1);;
-			mainLog.odometer=odo.getCount();;
+			mainLog.steering=getServoPos(0);
+			mainLog.throttle=getServoPos(1);
+			mainLog.odometer=odo.getCount();
 			mainLog.heading=getHeading();
 			float * q =getQuaternion();
 			mainLog.q0 = q[0];
@@ -57,12 +57,13 @@ void Logger::logLoop(void*) {
 			USER_EXIT_CRITICAL()
 			mainLog.Log();
 		}
-		OSTimeDly(TICKS_PER_SECOND/10); //Log at 10 Hz
+		OSTimeDly(TICKS_PER_SECOND/5); //Log at 5 Hz
 	}
 }
 
 void Logger::logBegin() {
-    OSSimpleTaskCreatewName(logLoop,LOG_PRIO,"Log");
+    LogFileVersions();
+	OSSimpleTaskCreatewName(logLoop,LOG_PRIO,"Log");
 }
 
 void Logger::logWrite(char* buf) {

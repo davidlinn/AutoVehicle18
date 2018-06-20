@@ -351,7 +351,7 @@ void MPU9250::magcalMPU9250(float * dest1, float * dest2)
   int16_t mag_max[3] = {-32767, -32767, -32767}, mag_min[3] = {32767, 32767, 32767}, mag_temp[3] = {0, 0, 0};
 
   printf("Mag Calibration: Wave device in a figure eight until done!");
-  OSTimeDly(TICKS_PER_SECOND*4);
+  OSTimeDly(TICKS_PER_SECOND);
   
 // shoot for ~fifteen seconds of mag data
     if(_Mmode == 0x02) sample_count = 128;  // at 8 Hz ODR, new mag data is available every 125 ms

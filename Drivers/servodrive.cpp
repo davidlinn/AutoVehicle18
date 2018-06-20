@@ -24,7 +24,7 @@ volatile uint32_t ServoTimes[NUM_SERVO_DRIVE];
 volatile int ServoMode[NUM_SERVO_DRIVE];
 volatile uint32_t ServoElapsed[NUM_SERVO_DRIVE];
 volatile uint32_t ServoIsr[NUM_SERVO_DRIVE];
-volatile uint32_t ServoPos[NUM_SERVO_DRIVE];
+volatile double ServoPos[NUM_SERVO_DRIVE];
 
 
 //Clock is 125Mhz
@@ -101,7 +101,7 @@ void ServoDriveInit()
 {
 	Pins[19].function(PIN_19_T0OUT );
 	Pins[21].function(PIN_21_T1OUT );
-	Pins[23].function(PIN_23_T2OUT );
+	//Pins[23].function(PIN_23_T2OUT );
 
 	for(int i=0; i<NUM_SERVO_DRIVE; i++) {
 		ServoTimes[i]=SERVO_ZERO;
@@ -171,6 +171,7 @@ void SetServoPos(int ch, double v)
 		v*=SERVO_DELTA;
 		v+=SERVO_ZERO;
 		dw=(uint32_t)v;
+		//printf("Setting ServoTimes[%i] to %lu\n",ch,dw);
 		ServoTimes[ch]=dw;
 		//Servo set to SERVO_DELTA*v+SERVO_ZERO
     }
@@ -180,16 +181,18 @@ void SetServoRaw(int ch, int v)
 {
 	if ((ch<0) || (ch>=NUM_SERVO_DRIVE)) return; //return if ch out of bounds
 
+	//calculations make ServoPos[ch] comparable for SetServoRaw and SetServoPos
+	ServoPos[ch] = ((double)(v-1024)*60)/SERVO_DELTA;
+
     int vc=v;
     vc-=1024;
     vc*=60;
     vc+=SERVO_ZERO;
 
-	if(vc<=SERVO_MIN) ServoTimes[ch]=SERVO_MIN;
-	else
-	if(vc>=SERVO_MAX) ServoTimes[ch]=SERVO_MAX;
-	else
-	ServoTimes[ch]=vc;
+	if (vc<=SERVO_MIN) ServoTimes[ch]=SERVO_MIN;
+	else if(vc>=SERVO_MAX) ServoTimes[ch]=SERVO_MAX;
+	else ServoTimes[ch]=vc;
+	//printf("Setting ServoTimes[%i] to %lu\n",ch,ServoTimes[ch]);
 	//Servo set to 60(v-1024)+SERVO_ZERO
 }
 

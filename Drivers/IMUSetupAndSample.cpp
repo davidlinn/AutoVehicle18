@@ -32,7 +32,7 @@
 #include "VehDefs.h"
 #include "LCD.h"
 
-#define SerialDebug 1
+#define SerialDebug 0
 #define CALIBGA 1 //set to 1 to recalibrate gyro and accelerometer
 #define CALIBMAG 1 //set to 1 to recalibrate magnetometer
 
@@ -115,7 +115,7 @@ void IMUSetup()
 	  lcd.clear();
 	  printf("\nAK8963 mag biases (mG)"); printf(" %f",magBias[0]); printf(" %f",magBias[1]); printf(" %f",magBias[2]);
 	  printf("\nAK8963 mag scale (mG)"); printf(" %f",magScale[0]); printf(" %f",magScale[1]); printf(" %f",magScale[2]);
-	  OSTimeDly(TICKS_PER_SECOND*2); // add delay to see results before serial spew of data
+	  OSTimeDly(TICKS_PER_SECOND); // add delay to see results before serial spew of data
   }
   if(SerialDebug) {
 	  printf("\nX-Axis sensitivity adjustment value "); printf("%f",magCalibration[0]);
@@ -266,10 +266,6 @@ void IMUSampleLoop(void*)
 				printf("\nGrav_x, Grav_y, Grav_z: %f, %f, %f mg",-a31*1000,-a32*1000,a33*1000);
 				printf("\nLin_ax, Lin_ay, Lin_az: %f, %f, %f mg",lin_ax*1000,lin_ay*1000,lin_az*1000);
 				printf("\nrate = "); printf("%f",(float)sumCount/sum); printf(" Hz");
-				lcd.clear();
-				char buf[16];
-				sprintf(buf, "Heading: %f", heading);
-				lcd.print(buf,16);
 			}
 
 			// With these settings the filter is updating at a ~145 Hz rate using the Madgwick scheme and
