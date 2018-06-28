@@ -17,9 +17,11 @@ public:
 	double getX();
 	double getY();
 	void navUpdate();
+	double getSteer();
+	double getThrottle();
 
 private:
-	double x; //estimated X,Y from odometer+IMU readings
+	double x; //estimated X,Y from odometer+IMU readings in FEET
 	double y;
 	double lastHeading;
 	uint32_t lastOdo;

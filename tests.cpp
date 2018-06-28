@@ -50,9 +50,9 @@ namespace tests {
 		}
 	}
 
-	void moveForwardXInches(int x) {
+	void moveForwardXFeet(int x) {
 		Odometer odo(49);
-		int stopOdoCount = Utility::inchesToOdo(x);
+		int stopOdoCount = Utility::feetToOdo(x);
 		while ((int)odo.getCount() <= stopOdoCount-10)
 			SetServoPos(1,.11);
 		SetServoPos(1,0);

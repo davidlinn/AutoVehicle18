@@ -12,6 +12,7 @@
 #include <math.h>
 #include "Drivers/servodrive.h"
 #include <stdio.h>
+//#include "Drivers/SpinningLidar.h"
 
 extern Odometer odo;
 
@@ -34,15 +35,23 @@ double Nav::getY() {
 void Nav::navUpdate() { //called every odometer tick
 	double headingAverage = (getHeading()+lastHeading)/2;
 	//double inchesTraveled = .21622; //inches traveled in a odo tick
-	double inchesTraveled = Utility::odoToInches(odo.getCount()-lastOdo);
+	double feetTraveled = Utility::odoToFeet(odo.getCount()-lastOdo);
 	if (getServoPos(1)>-.1) { //moving forward
-		x += inchesTraveled*cos(headingAverage*M_PI/180.);
-		y += inchesTraveled*sin(headingAverage*M_PI/180.);
+		x += feetTraveled*cos(headingAverage*M_PI/180.);
+		y += feetTraveled*sin(headingAverage*M_PI/180.);
 	}
 	else { //reverse
-		x -= inchesTraveled*cos(headingAverage*M_PI/180.);
-		y -= inchesTraveled*sin(headingAverage*M_PI/180.);
+		x -= feetTraveled*cos(headingAverage*M_PI/180.);
+		y -= feetTraveled*sin(headingAverage*M_PI/180.);
 	}
 	lastHeading = getHeading();
 	lastOdo = odo.getCount();
+}
+
+double Nav::getSteer() {
+	return 0;
+}
+
+double Nav::getThrottle() {
+	return 0;
 }

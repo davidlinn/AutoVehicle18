@@ -10,7 +10,7 @@
 
 namespace tests {
 void odoCalibration();
-void moveForwardXInches(int x);
+void moveForwardXFeet(int x);
 }
 
 #endif /* TESTS_H_ */

@@ -78,7 +78,7 @@ float zeta = sqrt(3.0f / 4.0f) * GyroMeasDrift;   // compute zeta, the other fre
 double delt_t = 0, count = 0, sumCount = 0;  // used to control display output rate
 float pitch, yaw, roll, heading;
 float a12, a22, a31, a32, a33;            // rotation matrix coefficients for Euler angles and gravity components
-double deltat, sum;          // integration interval for both filter schemes
+double currenttime, deltat, lasttime, sum;  //for timing integration interval
 
 float ax, ay, az, gx, gy, gz, mx, my, mz; // variables to hold latest sensor data values 
 float lin_ax, lin_ay, lin_az;             // linear acceleration (acceleration with gravity component subtracted)
@@ -156,8 +156,7 @@ PirqCount++;
 
 void IMUSampleLoop(void*)
 {  
-	HiResTimer* filtertimer = HiResTimer::getHiResTimer(IMU_TIMER);
-	filtertimer->start();
+	HiResTimer* filtertimer = HiResTimer::getHiResTimer(IMU_TIMER); //global read-only timer
 	while (1) {
 		PirqSem.Pend(); //Wait for a call to PirqSem.Post()
 	  // Interrupt pin just went high because there was new data to be read
@@ -187,9 +186,9 @@ void IMUSampleLoop(void*)
 		  mz *= magScale[2];
 		//}
 	 // }
-	  deltat = filtertimer->readTime(); // set integration time in seconds by time elapsed since last filter update
-	  filtertimer->stopClear(); //reset timer
-	  filtertimer->start();
+	  currenttime = filtertimer->readTime();
+	  deltat = currenttime-lasttime; // set integration time in seconds by time elapsed since last filter update
+	  lasttime = filtertimer->readTime();
 
 	  sum += deltat; // sum for averaging filter update rate
 	  ++sumCount;
