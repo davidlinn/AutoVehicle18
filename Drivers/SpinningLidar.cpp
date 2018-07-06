@@ -40,7 +40,7 @@ namespace SpinningLidar {
 			rv += read(fds, lidar_buffer + rv, 7-rv); //response descriptor
 		rv = 0;
 		while (rv < 3)
-			rv += read(fds, lidar_buffer + rv, 3-rv); //data response packet
+			rv += read(fds, lidar_buffer + rv, 3-rv); //response descriptor
 		if (lidar_buffer[0] != 0) {
 			printf("Check Spinning LIDAR health: status %i, error code %x %x\n",
 					lidar_buffer[0],(unsigned char)lidar_buffer[2], (unsigned char)lidar_buffer[1]);
@@ -113,6 +113,8 @@ namespace SpinningLidar {
 		else printf("LIDAR serial open successful");
 		if (checkHealth(fds)!=0) {
 			hardReset(fds);
+			while (dataavail(fds))
+				read(fds, lidar_buffer, 128); //clear out internal UART buffer
 			OSTimeDly(2);
 			if (checkHealth(fds)!=0) return;
 		}

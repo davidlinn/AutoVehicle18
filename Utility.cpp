@@ -100,4 +100,13 @@ namespace Utility {
 			deg+=360;
 		return deg;
 	}
+
+	int switchVal(int ADCCount) {
+		if (ADCCount<8000)
+			return -1;
+		else if (ADCCount<24000)
+			return 0;
+		else
+			return 1;
+	}
 }

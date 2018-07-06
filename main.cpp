@@ -28,6 +28,8 @@
 #include "Drivers/LidarPWM.h"
 #include "Drivers/SpinningLidar.h"
 #include "Drivers/pwm.h"
+#include <SimpleAD.h>
+#include <Boot_Settings.h>
 LOGFILEINFO;
 
 extern "C" {
@@ -44,12 +46,18 @@ LCD lcd; //LCD object, reinstantiated in init()
 Odometer odo; //Global odometer object, reinstantiated in init()
 MPU9250 imu; //Global imu object, reinstantiated in init()
 Nav nav; //Constructor does nothing
+NV_SettingsStruct NV_Settings;
 
 void init() {
 	//Display
 	Pins[38].function(PIN_38_UART5_TXD); //TX to Serial LCD
 	lcd = LCD(LCD_PORT,9600); //Reinstantiates global lcd on serial port defined in VehDefs.h w/ baud rate 9600
 	lcd.clear();
+
+	//Switches: From viewpoint of car, most forward switch is ch3, green button in back is ch0
+	//Left position produces ADC count of 0, middle in 16000s, right in 32000s
+	//Depressed green button produces ADC count of 0, undepressed in 32000s
+	InitSingleEndAD(); //initializes Analog to Digital Converter on processor
 
 	//Side LiDARs: Do immediately after display because this also initializes DMA Timers
 	// 2 & 3, which RC and IMU rely on
@@ -74,7 +82,6 @@ void init() {
 
 	//I2C (communication used for IMU)
 	MultiChannel_I2CInit();
-
 	//IMU
 	Pins[27].function(PIN_27_I2C0_SCL    );//I2C for IMU
 	Pins[29].function(PIN_29_I2C0_SDA    );//I2C For IMU
@@ -99,12 +106,15 @@ void init() {
 void LCDUpdate(void*) {
 	while (1) {
 		lcd.clear();
-		char buf[16];
-		sprintf(buf,"Lidar:%10f",SpinningLidar::dist[0]);
-		for (int i = 0; i<360; i+=15)
-			printf("Degree %i: %10f, Quality: %i\n",i,SpinningLidar::dist[i],SpinningLidar::sampleQuality[i]);
+		//char buf[32];
+		//StartAD(); //Starts one conversion: call GetADResult(int ch) to get result
+		//while (!ADDone())
+		//	OSTimeDly(2);
+		//printf("AD0:%i,AD1:%i,AD2:%i,AD3:%i\n",Utility::switchVal(GetADResult(0)),Utility::switchVal(GetADResult(1)),Utility::switchVal(GetADResult(2)),Utility::switchVal(GetADResult(3)));
+		//for (int i = 0; i<360; i+=15)
+			//printf("Degree %i: %10f, Quality: %i\n",i,SpinningLidar::dist[i],SpinningLidar::sampleQuality[i]);
 			//printf("Degree %i: %10i, Quality: %i\n",i,SpinningLidar::prevDist[i],SpinningLidar::prevSampleQuality[i]);
-		lcd.print(buf,16);
+		//lcd.print(buf,32);
 		OSTimeDly(TICKS_PER_SECOND/2); //delay .5s
 	}
 }
@@ -148,6 +158,7 @@ void UserMain(void * pd) {
     #endif
 
     iprintf("Application started\n");
+    CheckNVSettings();
     init();
     IMURun();
     bLog = true;

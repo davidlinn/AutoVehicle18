@@ -31,10 +31,12 @@
 #include "MadgwickFilter.h"
 #include "VehDefs.h"
 #include "LCD.h"
+#include <SimpleAD.h>
+#include <Boot_Settings.h>
+#include <system.h>
 
 #define SerialDebug 0
 #define CALIBGA 1 //set to 1 to recalibrate gyro and accelerometer
-#define CALIBMAG 1 //set to 1 to recalibrate magnetometer
 
 // Specify sensor full scale
 uint8_t Gscale = GFS250DPS;
@@ -108,14 +110,33 @@ void IMUSetup()
   
   // Get magnetometer calibration from AK8963 ROM
   imu.initAK8963(Mscale,Mmode,magCalibration); printf("\nAK8963 initialized for active data mode...."); // Initialize device for active mode read of magnetometer
-  if (CALIBMAG) {
+  StartAD();
+  while (!ADDone())
+	  OSTimeDly(1);
+  int recalibMag = (Utility::switchVal(GetADResult(0))==-1); //1 if green button depressed, 0 if not
+  if (recalibMag || NV_Settings.magBias[0]==0) { //if recalib mag button set or mag calib is 0
 	  lcd.clear();
-	  lcd.print("Calib Mag...");
+	  lcd.print("Recalib Mag...");
 	  imu.magcalMPU9250(magBias, magScale);
+
+	  //Save calibration to boot memory
+	  for (int i = 0; i < 3; ++i)
+		  NV_Settings.magBias[i] = magBias[i];
+	  for (int i = 0; i < 3; ++i)
+		  NV_Settings.magScale[i] = magScale[i];
+	  SaveUserParameters(&NV_Settings, sizeof(NV_Settings));
+
 	  lcd.clear();
 	  printf("\nAK8963 mag biases (mG)"); printf(" %f",magBias[0]); printf(" %f",magBias[1]); printf(" %f",magBias[2]);
 	  printf("\nAK8963 mag scale (mG)"); printf(" %f",magScale[0]); printf(" %f",magScale[1]); printf(" %f",magScale[2]);
 	  OSTimeDly(TICKS_PER_SECOND); // add delay to see results before serial spew of data
+  }
+  else {
+	  //Load calibration from boot memory
+	  for (int i = 0; i < 3; ++i)
+		  magBias[i]=NV_Settings.magBias[i];
+	  for (int i = 0; i < 3; ++i)
+		  magScale[i]=NV_Settings.magScale[i];
   }
   if(SerialDebug) {
 	  printf("\nX-Axis sensitivity adjustment value "); printf("%f",magCalibration[0]);
