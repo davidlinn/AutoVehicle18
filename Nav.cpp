@@ -12,7 +12,10 @@
 #include <math.h>
 #include "Drivers/servodrive.h"
 #include <stdio.h>
+#include <math.h>
 //#include "Drivers/SpinningLidar.h"
+
+#define K_P .01
 
 extern Odometer odo;
 
@@ -24,11 +27,11 @@ Nav::~Nav() {
 
 }
 
-double Nav::getX() {
+float Nav::getX() {
 	return x;
 }
 
-double Nav::getY() {
+float Nav::getY() {
 	return y;
 }
 
@@ -46,12 +49,18 @@ void Nav::navUpdate() { //called every odometer tick
 	}
 	lastHeading = getHeading();
 	lastOdo = odo.getCount();
+	heading_des = (180./M_PI)*atan2(y_des-y,x_des-x);
 }
 
-double Nav::getSteer() {
+float Nav::getSteer() { //1 left, -1 right
+	float error = Utility::degreeWrap(heading_des-lastHeading);
+	return K_P*error;
+}
+
+float Nav::getThrottle() {
 	return 0;
 }
 
-double Nav::getThrottle() {
-	return 0;
+float Nav::getHeadDes() {
+	return heading_des;
 }

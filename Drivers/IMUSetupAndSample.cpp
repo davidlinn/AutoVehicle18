@@ -56,9 +56,6 @@ int16_t gyroCount[3];   // Stores the 16-bit signed gyro sensor output
 int16_t magCount[3];    // Stores the 16-bit signed magnetometer sensor output
 float magCalibration[3] = {0, 0, 0};  // Factory mag calibration and mag bias
 float gyroBias[3] = {0, 0, 0}, accelBias[3] = {0, 0, 0}, magBias[3] = {0, 0, 0}, magScale[3]  = {0, 0, 0};      // Bias corrections for gyro and accelerometer
-int16_t tempCount;            // temperature raw count output
-float   temperature;          // Stores the MPU9250 gyro internal chip temperature in degrees Celsius
-double Temperature, Pressure; // stores MS5637 pressures sensor pressure and temperature
 float SelfTest[6];            // holds results of gyro and accelerometer self test
 
 // global constants for 9 DoF fusion and AHRS (Attitude and Heading Reference System)
@@ -77,10 +74,10 @@ float zeta = sqrt(3.0f / 4.0f) * GyroMeasDrift;   // compute zeta, the other fre
 #define Kp 2.0f * 5.0f // these are the free parameters in the Mahony filter and fusion scheme, Kp for proportional feedback, Ki for integral
 #define Ki 0.0f
 
-double delt_t = 0, count = 0, sumCount = 0;  // used to control display output rate
+float delt_t = 0, count = 0, sumCount = 0;  // used to control display output rate
 float pitch, yaw, roll, heading;
 float a12, a22, a31, a32, a33;            // rotation matrix coefficients for Euler angles and gravity components
-double currenttime, deltat, lasttime, sum;  //for timing integration interval
+float currenttime, deltat, lasttime, sum;  //for timing integration interval
 
 float ax, ay, az, gx, gy, gz, mx, my, mz; // variables to hold latest sensor data values 
 float lin_ax, lin_ay, lin_az;             // linear acceleration (acceleration with gravity component subtracted)

@@ -106,15 +106,10 @@ void init() {
 void LCDUpdate(void*) {
 	while (1) {
 		lcd.clear();
-		//char buf[32];
-		//StartAD(); //Starts one conversion: call GetADResult(int ch) to get result
-		//while (!ADDone())
-		//	OSTimeDly(2);
-		//printf("AD0:%i,AD1:%i,AD2:%i,AD3:%i\n",Utility::switchVal(GetADResult(0)),Utility::switchVal(GetADResult(1)),Utility::switchVal(GetADResult(2)),Utility::switchVal(GetADResult(3)));
-		//for (int i = 0; i<360; i+=15)
-			//printf("Degree %i: %10f, Quality: %i\n",i,SpinningLidar::dist[i],SpinningLidar::sampleQuality[i]);
-			//printf("Degree %i: %10i, Quality: %i\n",i,SpinningLidar::prevDist[i],SpinningLidar::prevSampleQuality[i]);
-		//lcd.print(buf,32);
+		char buf[32];
+		sprintf(buf,"x:%4f,y:%4f,head:%4f,head_des:%4f",nav.getX(),nav.getY(),getHeading(),nav.getHeadDes());
+		printf("Heading: %f\n", getHeading());
+		lcd.print(buf,32);
 		OSTimeDly(TICKS_PER_SECOND/2); //delay .5s
 	}
 }
@@ -133,7 +128,7 @@ void Drive(void*) {
 			SetServoPos(0,nav.getSteer()); //Steer
 			SetServoPos(1,nav.getThrottle()); //Throttle
 		}
-		nav.navUpdate();
+		//nav.navUpdate();
 		OSTimeDly(TICKS_PER_SECOND/10);
 	}
 }

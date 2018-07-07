@@ -9,7 +9,7 @@
 
 extern float q[4];
 extern float beta;
-extern double deltat;
+extern float deltat;
 
 namespace Madge {
 

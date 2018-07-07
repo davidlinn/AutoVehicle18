@@ -14,17 +14,21 @@ class Nav { //defines the robot's position in the map and plans motion
 public:
 	Nav();
 	virtual ~Nav();
-	double getX();
-	double getY();
+	float getX();
+	float getY();
 	void navUpdate();
-	double getSteer();
-	double getThrottle();
+	float getSteer();
+	float getThrottle();
+	float getHeadDes();
 
 private:
-	double x; //estimated X,Y from odometer+IMU readings in FEET
-	double y;
-	double lastHeading;
+	float x; //estimated X,Y from odometer+IMU readings in FEET
+	float y;
+	float lastHeading;
 	uint32_t lastOdo;
+	float x_des = 30;
+	float y_des = 0;
+	float heading_des;
 };
 
 #endif /* NAV_H_ */
