@@ -24,15 +24,11 @@ extern Nav nav;
 START_INTRO_OBJ(MainLogObject,"Log")
 double_element steering{"steering"};
 double_element throttle{"throttle"};
-uint32_element odometer{"odometer"};
 float_element heading{"heading"};
-float_element q0{"q0"};
-float_element q1{"q1"};
-float_element q2{"q2"};
-float_element q3{"q3"};
-uint16_element x{"x"};
-uint16_element y{"y"};
-//uint16_element c7{"c7"};
+float_element x{"x"};
+float_element y{"y"};
+float_element v{"v"};
+int_element finished{"finished"};
 END_INTRO_OBJ;
 
 MainLogObject mainLog;
@@ -44,16 +40,11 @@ void Logger::logLoop(void*) {
 			USER_ENTER_CRITICAL()
 			mainLog.steering=getServoPos(0);
 			mainLog.throttle=getServoPos(1);
-			mainLog.odometer=odo.getCount();
 			mainLog.heading=getHeading();
-			float * q =getQuaternion();
-			mainLog.q0 = q[0];
-			mainLog.q1 = q[1];
-			mainLog.q2 = q[2];
-			mainLog.q3 = q[3];
 			mainLog.x=nav.getX();
 			mainLog.y=nav.getY();
-			//RcLog.c7=rc_ch[7];
+			mainLog.v=nav.getV();
+			mainLog.finished=(int)nav.isFinished();
 			USER_EXIT_CRITICAL()
 			mainLog.Log();
 		}

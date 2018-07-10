@@ -81,6 +81,7 @@ void LidarPWMInit() {
 
 void GlobalTimerInit(int timerNum)
 {
+	printf("Initialized global timer %i\n", timerNum);
 	sim2.timer[timerNum].txmr=0;
 	sim2.timer[timerNum].ter=3;
 	sim2.timer[timerNum].trr=0;

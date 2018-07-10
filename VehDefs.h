@@ -24,6 +24,7 @@
 #define RIGHTLIDAR_TIMER 3 //Timer Counter Register not reset: can be used by other funcs for measurement
 #define DSM_TIMER 3 //Read current time only
 #define IMU_TIMER 3 //Read current time only
+#define GLOBAL_TIMER 3 //Read current time only
 
 //UART Ports
 #define LCD_PORT 5

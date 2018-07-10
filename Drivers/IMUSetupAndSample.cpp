@@ -74,10 +74,11 @@ float zeta = sqrt(3.0f / 4.0f) * GyroMeasDrift;   // compute zeta, the other fre
 #define Kp 2.0f * 5.0f // these are the free parameters in the Mahony filter and fusion scheme, Kp for proportional feedback, Ki for integral
 #define Ki 0.0f
 
-float delt_t = 0, count = 0, sumCount = 0;  // used to control display output rate
+int sumCount = 0;
 float pitch, yaw, roll, heading;
 float a12, a22, a31, a32, a33;            // rotation matrix coefficients for Euler angles and gravity components
-float currenttime, deltat, lasttime, sum;  //for timing integration interval
+double currenttime, deltat, lasttime, sum;  //for timing integration interval
+float zeroOffset; //offset created by zeroing heading
 
 float ax, ay, az, gx, gy, gz, mx, my, mz; // variables to hold latest sensor data values 
 float lin_ax, lin_ay, lin_az;             // linear acceleration (acceleration with gravity component subtracted)
@@ -111,7 +112,7 @@ void IMUSetup()
   while (!ADDone())
 	  OSTimeDly(1);
   int recalibMag = (Utility::switchVal(GetADResult(0))==-1); //1 if green button depressed, 0 if not
-  if (recalibMag || NV_Settings.magBias[0]==0) { //if recalib mag button set or mag calib is 0
+  if (recalibMag || NV_Settings.magScale[0]==0) { //if recalib mag button set or mag calib is 0
 	  lcd.clear();
 	  lcd.print("Recalib Mag...");
 	  imu.magcalMPU9250(magBias, magScale);
@@ -172,117 +173,135 @@ PirqCount++;
 }
 //-----------------------
 
-void IMUSampleLoop(void*)
-{  
+void IMUSampleLoop(void*) {
 	HiResTimer* filtertimer = HiResTimer::getHiResTimer(IMU_TIMER); //global read-only timer
+	filtertimer->start();
 	while (1) {
 		PirqSem.Pend(); //Wait for a call to PirqSem.Post()
-	  // Interrupt pin just went high because there was new data to be read
-		 imu.readMPU9250Data(MPU9250Data); // interrupt cleared (goes low) on any read
-	 //   readAccelData(accelCount);  // Read the x/y/z adc values
+		// Interrupt pin just went high because there was new data to be read
+		imu.readMPU9250Data(MPU9250Data); // interrupt cleared (goes low) on any read
+		//   readAccelData(accelCount);  // Read the x/y/z adc values
 		// Now we'll calculate the accleration value into actual g's
-		ax = (float)MPU9250Data[0]*aRes - accelBias[0];  // get actual g value, this depends on scale being set
-		ay = (float)MPU9250Data[1]*aRes - accelBias[1];
-		az = (float)MPU9250Data[2]*aRes - accelBias[2];
+		ax = (float) MPU9250Data[0] * aRes - accelBias[0]; // get actual g value, this depends on scale being set
+		ay = (float) MPU9250Data[1] * aRes - accelBias[1];
+		az = (float) MPU9250Data[2] * aRes - accelBias[2];
 
-	 //   readGyroData(gyroCount);  // Read the x/y/z adc values
+		//   readGyroData(gyroCount);  // Read the x/y/z adc values
 
 		// Calculate the gyro value into actual degrees per second
-		gx = (float)MPU9250Data[4]*gRes;  // get actual gyro value, this depends on scale being set
-		gy = (float)MPU9250Data[5]*gRes;
-		gz = (float)MPU9250Data[6]*gRes;
-		imu.readMagData(magCount);  // Read the x/y/z adc values
+		gx = (float) MPU9250Data[4] * gRes; // get actual gyro value, this depends on scale being set
+		gy = (float) MPU9250Data[5] * gRes;
+		gz = (float) MPU9250Data[6] * gRes;
+		imu.readMagData(magCount); // Read the x/y/z adc values
 		// Calculate the magnetometer values in milliGauss
 		// Include factory calibration per data sheet and user environmental corrections
-		//if(newMagData == true) {
-		//  newMagData = false; // reset newMagData flag
-		  mx = (float)magCount[0]*mRes*magCalibration[0] - magBias[0];  // get actual magnetometer value, this depends on scale being set
-		  my = (float)magCount[1]*mRes*magCalibration[1] - magBias[1];
-		  mz = (float)magCount[2]*mRes*magCalibration[2] - magBias[2];
-		  mx *= magScale[0];
-		  my *= magScale[1];
-		  mz *= magScale[2];
-		//}
-	 // }
-	  currenttime = filtertimer->readTime();
-	  deltat = currenttime-lasttime; // set integration time in seconds by time elapsed since last filter update
-	  lasttime = filtertimer->readTime();
+		mx = (float) magCount[0] * mRes * magCalibration[0] - magBias[0]; // get actual magnetometer value, this depends on scale being set
+		my = (float) magCount[1] * mRes * magCalibration[1] - magBias[1];
+		mz = (float) magCount[2] * mRes * magCalibration[2] - magBias[2];
+		mx *= magScale[0];
+		my *= magScale[1];
+		mz *= magScale[2];
+		currenttime = filtertimer->readTime();
+		deltat = currenttime - lasttime; // set integration time in seconds by time elapsed since last filter update
+		lasttime = filtertimer->readTime();
 
-	  sum += deltat; // sum for averaging filter update rate
-	  ++sumCount;
+		sum += deltat; // sum for averaging filter update rate
+		++sumCount;
 
-	  // Sensors x (y)-axis of the accelerometer/gyro is aligned with the y (x)-axis of the magnetometer;
-	  // the magnetometer z-axis (+ down) is misaligned with z-axis (+ up) of accelerometer and gyro!
-	  // We have to make some allowance for this orientation mismatch in feeding the output to the quaternion filter.
-	  // For the MPU9250+MS5637 Mini breakout the +x accel/gyro is North, then -y accel/gyro is East. So if we want te quaternions properly aligned
-	  // we need to feed into the Madgwick function Ax, -Ay, -Az, Gx, -Gy, -Gz, My, -Mx, and Mz. But because gravity is by convention
-	  // positive down, we need to invert the accel data, so we pass -Ax, Ay, Az, Gx, -Gy, -Gz, My, -Mx, and Mz into the Madgwick
-	  // function to get North along the accel +x-axis, East along the accel -y-axis, and Down along the accel -z-axis.
-	  // This orientation choice can be modified to allow any convenient (non-NED) orientation convention.
-	  // Pass gyro rate as rad/s
-		Madge::MadgwickQuaternionUpdate(-ax, ay, az, gx*M_PI/180.0f, -gy*M_PI/180.0f, -gz*M_PI/180.0f,  my,  -mx, mz);
-	//  if(passThru)MahonyQuaternionUpdate(-ax, ay, az, gx*PI/180.0f, -gy*PI/180.0f, -gz*PI/180.0f,  my,  -mx, mz);
+		// Sensors x (y)-axis of the accelerometer/gyro is aligned with the y (x)-axis of the magnetometer;
+		// the magnetometer z-axis (+ down) is misaligned with z-axis (+ up) of accelerometer and gyro!
+		// We have to make some allowance for this orientation mismatch in feeding the output to the quaternion filter.
+		// For the MPU9250+MS5637 Mini breakout the +x accel/gyro is North, then -y accel/gyro is East. So if we want te quaternions properly aligned
+		// we need to feed into the Madgwick function Ax, -Ay, -Az, Gx, -Gy, -Gz, My, -Mx, and Mz. But because gravity is by convention
+		// positive down, we need to invert the accel data, so we pass -Ax, Ay, Az, Gx, -Gy, -Gz, My, -Mx, and Mz into the Madgwick
+		// function to get North along the accel +x-axis, East along the accel -y-axis, and Down along the accel -z-axis.
+		// This orientation choice can be modified to allow any convenient (non-NED) orientation convention.
+		// Pass gyro rate as rad/s
+		Madge::MadgwickQuaternionUpdate(-ax, ay, az, gx * M_PI / 180.0f,
+				-gy * M_PI / 180.0f, -gz * M_PI / 180.0f, my, -mx, mz);
+		//  if(passThru)MahonyQuaternionUpdate(-ax, ay, az, gx*PI/180.0f, -gy*PI/180.0f, -gz*PI/180.0f,  my,  -mx, mz);
 		// Serial print and/or display at 0.5 s rate independent of data rates
-		//delt_t = (filtertimer->readTime()/1000) - count;
-		if (sum>.5) { // update LCD once per half-second independent of read rate
-			if(SerialDebug) {
-				printf("\ngRes = %f",gRes);
-				printf("\nax = "); printf("%f",(int)1000*ax);
-				printf(" ay = "); printf("%f",(int)1000*ay);
-				printf(" az = "); printf("%f",(int)1000*az); printf(" mg");
-				printf("\ngx = "); printf( "%f",gx);
-				printf(" gy = "); printf( "%f",gy);
-				printf(" gz = "); printf("%f", gz); printf(" deg/s");
-				printf("\nmx = "); printf( "%i",(int)mx );
-				printf(" my = "); printf("%i", (int)my );
-				printf(" mz = "); printf("%i", (int)mz ); printf(" mG");
+		if (sum > .5) { // update LCD once per half-second independent of read rate
+			if (SerialDebug) {
+				printf("\ngRes = %f", gRes);
+				printf("\nax = ");
+				printf("%f", (int) 1000 * ax);
+				printf(" ay = ");
+				printf("%f", (int) 1000 * ay);
+				printf(" az = ");
+				printf("%f", (int) 1000 * az);
+				printf(" mg");
+				printf("\ngx = ");
+				printf("%f", gx);
+				printf(" gy = ");
+				printf("%f", gy);
+				printf(" gz = ");
+				printf("%f", gz);
+				printf(" deg/s");
+				printf("\nmx = ");
+				printf("%i", (int) mx);
+				printf(" my = ");
+				printf("%i", (int) my);
+				printf(" mz = ");
+				printf("%i", (int) mz);
+				printf(" mG");
 
-				printf("\nq0 = "); printf("%f",q[0]);
-				printf(" qx = "); printf("%f",q[1]);
-				printf(" qy = "); printf("%f",q[2]);
-				printf(" qz = "); printf("%f",q[3]);
+				printf("\nq0 = ");
+				printf("%f", q[0]);
+				printf(" qx = ");
+				printf("%f", q[1]);
+				printf(" qy = ");
+				printf("%f", q[2]);
+				printf(" qz = ");
+				printf("%f", q[3]);
 			}
 			//tempCount = imu.readTempData();  // Read the gyro adc values
 			//temperature = ((float) tempCount) / 333.87 + 21.0; // Gyro chip temperature in degrees Centigrade
-		   // Print temperature in degrees Centigrade
+			// Print temperature in degrees Centigrade
 			//printf("Gyro temperature is ");  printf(temperature, 1);  printf(" degrees C"); // Print T values to tenths of s degree C
 
-		   // Define output variables from updated quaternion---these are Tait-Bryan angles, commonly used in aircraft orientation.
-		  // In this coordinate system, the positive z-axis is down toward Earth.
-		  // Yaw is the angle between Sensor x-axis and Earth magnetic North (or true North if corrected for local declination, looking down on the sensor positive yaw is counterclockwise.
-		  // Pitch is angle between sensor x-axis and Earth ground plane, toward the Earth is positive, up toward the sky is negative.
-		  // Roll is angle between sensor y-axis and Earth ground plane, y-axis up is positive roll.
-		  // These arise from the definition of the homogeneous rotation matrix constructed from quaternions.
-		  // Tait-Bryan angles as well as Euler angles are non-commutative; that is, the get the correct orientation the rotations must be
-		  // applied in the correct order which for this configuration is yaw, pitch, and then roll.
-		  // For more see http://en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles which has additional links.
+			// Define output variables from updated quaternion---these are Tait-Bryan angles, commonly used in aircraft orientation.
+			// In this coordinate system, the positive z-axis is down toward Earth.
+			// Yaw is the angle between Sensor x-axis and Earth magnetic North (or true North if corrected for local declination, looking down on the sensor positive yaw is counterclockwise.
+			// Pitch is angle between sensor x-axis and Earth ground plane, toward the Earth is positive, up toward the sky is negative.
+			// Roll is angle between sensor y-axis and Earth ground plane, y-axis up is positive roll.
+			// These arise from the definition of the homogeneous rotation matrix constructed from quaternions.
+			// Tait-Bryan angles as well as Euler angles are non-commutative; that is, the get the correct orientation the rotations must be
+			// applied in the correct order which for this configuration is yaw, pitch, and then roll.
+			// For more see http://en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles which has additional links.
 			//Software AHRS:
-			a12 =   2.0f * (q[1] * q[2] + q[0] * q[3]);
-			a22 = 1 - (2.0f*( pow(q[2],2) + pow(q[3],2) ));
-			a31 =   2.0f * (q[0] * q[1] + q[2] * q[3]);
-			a32 =   2.0f * (q[1] * q[3] - q[0] * q[2]);
-			a33 =   q[0] * q[0] - q[1] * q[1] - q[2] * q[2] + q[3] * q[3];
+			a12 = 2.0f * (q[1] * q[2] + q[0] * q[3]);
+			a22 = 1 - (2.0f * (pow(q[2], 2) + pow(q[3], 2)));
+			a31 = 2.0f * (q[0] * q[1] + q[2] * q[3]);
+			a32 = 2.0f * (q[1] * q[3] - q[0] * q[2]);
+			a33 = q[0] * q[0] - q[1] * q[1] - q[2] * q[2] + q[3] * q[3];
 			pitch = -asinf(a32);
-			roll  = atan2f(a31, a33);
-			yaw   = atan2f(a12, a22);
+			roll = atan2f(a31, a33);
+			yaw = atan2f(a12, a22);
 			pitch *= 180.0f / M_PI;
-			yaw   *= 180.0f / M_PI;
+			yaw *= 180.0f / M_PI;
 
 			//Heading is defined for the Cartesian coordiate system, where 0 degrees points along the x-axis
 			//Heading increases in the counterclockwise direction
-			heading = Utility::degreeWrap(-yaw+180-11.52); // Declination at San Diego, California is 11.52E on 6/8/18
-
-			roll  *= 180.0f / M_PI;
+			heading = Utility::degreeWrap(-yaw + 180 - 11.52); // Declination at San Diego, California is 11.52E on 6/8/18
+			//The following line assumes that the ADC is updated every so often by calling StartAD(): we do it in LCDUpdate()
+			if (zeroOffset==0 && Utility::switchVal(GetADResult(1))==1) //if heading hasn't been zeroed yet and first switch is in the right position
+				zeroOffset = heading;
+			roll *= 180.0f / M_PI;
 			lin_ax = ax + a31;
 			lin_ay = ay + a32;
 			lin_az = az - a33;
-			if(SerialDebug) {
+			if (SerialDebug) {
 				printf("\nYaw, Pitch, Roll: %f, %f, %f", yaw, pitch, roll);
-				printf("\nHeading: %f",heading);
+				printf("\nHeading: %f", heading);
 
-				printf("\nGrav_x, Grav_y, Grav_z: %f, %f, %f mg",-a31*1000,-a32*1000,a33*1000);
-				printf("\nLin_ax, Lin_ay, Lin_az: %f, %f, %f mg",lin_ax*1000,lin_ay*1000,lin_az*1000);
-				printf("\nrate = "); printf("%f",(float)sumCount/sum); printf(" Hz");
+				printf("\nGrav_x, Grav_y, Grav_z: %f, %f, %f mg", -a31 * 1000,
+						-a32 * 1000, a33 * 1000);
+				printf("\nLin_ax, Lin_ay, Lin_az: %f, %f, %f mg", lin_ax * 1000,
+						lin_ay * 1000, lin_az * 1000);
+				printf("\nrate = ");
+				printf("%f", (double) sumCount / sum);
+				printf(" Hz");
 			}
 
 			// With these settings the filter is updating at a ~145 Hz rate using the Madgwick scheme and
@@ -348,7 +367,7 @@ void IMURun() {
 }
 
 float getHeading() {
-	return heading;
+	return Utility::degreeWrap(heading-zeroOffset);
 }
 
 float* getQuaternion() {

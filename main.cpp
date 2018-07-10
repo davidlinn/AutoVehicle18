@@ -107,9 +107,11 @@ void LCDUpdate(void*) {
 	while (1) {
 		lcd.clear();
 		char buf[32];
-		sprintf(buf,"x:%4f,y:%4f,head:%4f,head_des:%4f",nav.getX(),nav.getY(),getHeading(),nav.getHeadDes());
-		printf("Heading: %f\n", getHeading());
+		if (!nav.isFinished())
+			sprintf(buf,"x:%4.2f,y:%4.2f,h:%4.1f,hd:%4.1f",nav.getX(),nav.getY(),getHeading(),nav.getHeadDes());
+		else sprintf(buf,":) x:%4.2f,y:%4.2f,h:%4.1f",nav.getX(),nav.getY(),getHeading());
 		lcd.print(buf,32);
+		StartAD();
 		OSTimeDly(TICKS_PER_SECOND/2); //delay .5s
 	}
 }
@@ -128,7 +130,7 @@ void Drive(void*) {
 			SetServoPos(0,nav.getSteer()); //Steer
 			SetServoPos(1,nav.getThrottle()); //Throttle
 		}
-		//nav.navUpdate();
+		nav.navUpdate();
 		OSTimeDly(TICKS_PER_SECOND/10);
 	}
 }
