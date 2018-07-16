@@ -21,11 +21,11 @@ extern LCD lcd;
 namespace Utility {
 
 	int mode() {
-		//(1=347,2=1032,3=1716)
+		//(1=139-539,2=824-1224,3=1508-1908)
 		//1 = manual, 2=semi-auto, 3=full auto
-		if (rc_ch[5] == 1716) return 3;
-		else if (rc_ch[5] == 1032)	return 2;
-		else return 1;
+		if (rc_ch[5] < 700) return 1;
+		else if (rc_ch[5] > 1400)	return 3;
+		else return 2;
 	}
 
 	void countdown(int secs, int x, int y) { //display countdown info, secs is an integer between 1 and 99
@@ -108,5 +108,9 @@ namespace Utility {
 			return 0;
 		else
 			return 1;
+	}
+
+	float cmToFt(float cm) {
+		return .0328084*cm;
 	}
 }

@@ -9,7 +9,8 @@
 #define MAP_H_
 
 #include <basictypes.h>
-#include <c++/5.2.0/vector>
+#include <vector>
+using std::vector;
 
 class Map { //Class defines unknown features in a known 2D map
 public:
@@ -23,7 +24,7 @@ public:
 		double uncertainty; //radius of uncertainty around (x,y) position
 		double estimateCount; //num times this feature has been estimated
 	};
-	std::vector<Feature> featureList;
+	vector<Feature> featureList;
 
 };
 

@@ -140,10 +140,10 @@ void IMUSetup()
 	  printf("\nX-Axis sensitivity adjustment value "); printf("%f",magCalibration[0]);
 	  printf("\nY-Axis sensitivity adjustment value "); printf("%f",magCalibration[1]);
 	  printf("\nZ-Axis sensitivity adjustment value "); printf("%f\n",magCalibration[2]);
+	  OSTimeDly(TICKS_PER_SECOND);
   }
-  OSTimeDly(TICKS_PER_SECOND);
-  HiResTimer* filtertimer = HiResTimer::getHiResTimer(IMU_TIMER);
-  filtertimer->init();
+  //HiResTimer* filtertimer = HiResTimer::getHiResTimer(IMU_TIMER);
+  //filtertimer->init();
 }
 
 void CalibAccAndGyro() {
@@ -175,10 +175,10 @@ PirqCount++;
 
 void IMUSampleLoop(void*) {
 	HiResTimer* filtertimer = HiResTimer::getHiResTimer(IMU_TIMER); //global read-only timer
-	filtertimer->start();
+	//filtertimer->start();
 	while (1) {
 		PirqSem.Pend(); //Wait for a call to PirqSem.Post()
-		// Interrupt pin just went high because there was new data to be read
+		// If we get here, interrupt pin just went high because there was new data to be read
 		imu.readMPU9250Data(MPU9250Data); // interrupt cleared (goes low) on any read
 		//   readAccelData(accelCount);  // Read the x/y/z adc values
 		// Now we'll calculate the accleration value into actual g's
@@ -286,7 +286,7 @@ void IMUSampleLoop(void*) {
 			heading = Utility::degreeWrap(-yaw + 180 - 11.52); // Declination at San Diego, California is 11.52E on 6/8/18
 			//The following line assumes that the ADC is updated every so often by calling StartAD(): we do it in LCDUpdate()
 			if (zeroOffset==0 && Utility::switchVal(GetADResult(1))==1) //if heading hasn't been zeroed yet and first switch is in the right position
-				zeroOffset = heading;
+				zeroHeading();
 			roll *= 180.0f / M_PI;
 			lin_ax = ax + a31;
 			lin_ay = ay + a32;
@@ -368,6 +368,10 @@ void IMURun() {
 
 float getHeading() {
 	return Utility::degreeWrap(heading-zeroOffset);
+}
+
+void zeroHeading() {
+	zeroOffset = heading;
 }
 
 float* getQuaternion() {

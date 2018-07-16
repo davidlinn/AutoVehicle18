@@ -18,11 +18,12 @@
 #include <pin_irq.h>
 #include "Math.h"
 #include <HiResTimer.h>
+#include "VehDefs.h"
 
 MPU9250::MPU9250(uint8_t intPin)
 {
   _intPin = intPin;
-  timer = HiResTimer::getHiResTimer();
+  timer = HiResTimer::getHiResTimer(IMU_TIMER);
   if (timer == nullptr)
 	  printf("HiResTimer not initialized\n");
   timer->init();
@@ -145,7 +146,7 @@ void MPU9250::accelWakeOnMotion()
   writeByte(MPU9250_ADDRESS, PWR_MGMT_1, c | 0x20);     // Write bit 5 to enable accel cycling
 
   gyromagSleep();
-  timer->delay(.100); // Wait for all registers to reset
+  OSTimeDly(TICKS_PER_SECOND/10); // Wait for all registers to reset
 
 }
 
@@ -175,7 +176,7 @@ void MPU9250::resetMPU9250()
 {
   // reset device
   writeByte(MPU9250_ADDRESS, PWR_MGMT_1, 0x80); // Set bit 7 to reset MPU9250
-  timer->delay(.100); // Wait for all registers to reset
+  OSTimeDly(TICKS_PER_SECOND/10); // Wait for all registers to reset
 }
 
 void MPU9250::readMPU9250Data(int16_t * destination)

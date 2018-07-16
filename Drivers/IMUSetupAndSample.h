@@ -35,5 +35,6 @@ void CalibAccAndGyro();
 void unclodI2C();
 int whoAmICheck();
 void Pirq(void);
+void zeroHeading();
 
 #endif /* IMUSETUPANDLOOP_H_ */

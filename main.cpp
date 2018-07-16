@@ -59,27 +59,6 @@ void init() {
 	//Depressed green button produces ADC count of 0, undepressed in 32000s
 	InitSingleEndAD(); //initializes Analog to Digital Converter on processor
 
-	//Side LiDARs: Do immediately after display because this also initializes DMA Timers
-	// 2 & 3, which RC and IMU rely on
-	Pins[23].function(PIN_23_T2IN); //LIDAR pulse left / Timer 2 in
-	Pins[25].function(PIN_25_T3IN); //LIDAR pulse right / Timer 3 in
-	LidarPWMInit(); //initializes both side LIDARS and global timers
-
-	//Top LiDAR
-	Pins[13].function(PIN_13_UART2_RXD);	//LIDAR RX
-	Pins[16].function(PIN_16_UART2_TXD);	//LIDAR TX
-	PinPWM(39, 25000, .58); //PWM at 25000 Hz with a 58% duty cycle
-	//motor val provides about 180 samples per 360 deg scan- that means a sample every 2 degrees or so
-	//OSTimeDly(TICKS_PER_SECOND);
-
-	//RC
-	Pins[14].function(PIN_14_UART6_RXD);	//RC RX
-	InitDSM2Rx(RC_PORT); //Initialize RC on UART Port 6
-	iprintf("Initialized RC\n");
-
-	//Odometer
-	odo = Odometer(49); //creates Odometer object on pin 49
-
 	//I2C (communication used for IMU)
 	MultiChannel_I2CInit();
 	//IMU
@@ -90,6 +69,27 @@ void init() {
 	imu = MPU9250(50); //reconstruct MPU9250 object on interrupt pin 50 (interrupt pin goes high when new data available)
 	OSTimeDly(3); //delay 3 ticks to give IMU time to set up its registers
 	IMUSetup();
+
+	//Side LiDARs: Do immediately after IMU because this also initializes DMA Timers
+	// 2 & 3, which RC relies on but IMU setup uses
+	Pins[23].function(PIN_23_T2IN); //LIDAR pulse left / Timer 2 in
+	Pins[25].function(PIN_25_T3IN); //LIDAR pulse right / Timer 3 in
+	LidarPWMInitOld(); //initializes both side LIDARS and global timers
+
+	//RC
+	Pins[14].function(PIN_14_UART6_RXD);	//RC RX
+	InitDSM2Rx(RC_PORT); //Initialize RC on UART Port 6
+	iprintf("Initialized RC\n");
+
+	//Top LiDAR
+	Pins[13].function(PIN_13_UART2_RXD);	//LIDAR RX
+	Pins[16].function(PIN_16_UART2_TXD);	//LIDAR TX
+	PinPWM(39, 25000, .58); //PWM at 25000 Hz with a 58% duty cycle
+	//motor val provides about 180 samples per 360 deg scan- that means a sample every 2 degrees or so
+	//OSTimeDly(TICKS_PER_SECOND);
+
+	//Odometer
+	odo = Odometer(49); //creates Odometer object on pin 49
 
 	//FTP Server for Log Transmission
 	InitLogFtp(FTP_PRIO);
@@ -107,11 +107,13 @@ void LCDUpdate(void*) {
 	while (1) {
 		lcd.clear();
 		char buf[32];
+		//Nav
 		if (!nav.isFinished())
-			sprintf(buf,"x:%4.2f,y:%4.2f,h:%4.1f,hd:%4.1f",nav.getX(),nav.getY(),getHeading(),nav.getHeadDes());
-		else sprintf(buf,":) x:%4.2f,y:%4.2f,h:%4.1f",nav.getX(),nav.getY(),getHeading());
+			sprintf(buf,"x:%3.1f,y:%3.1f,rwe:%3.1f,herr:%3.1f",nav.getX(),nav.getY(),nav.getRightWallEst(),nav.getHeadError());
+		else sprintf(buf,":) x:%4.2f,y:%4.2f",nav.getX(),nav.getY());
 		lcd.print(buf,32);
-		StartAD();
+		printf("Right Lidar: %f, Heading: %f\n", getRightLidar(), getHeading());
+		StartAD(); //Updates analog to digital converter so other functions can read switches
 		OSTimeDly(TICKS_PER_SECOND/2); //delay .5s
 	}
 }
@@ -130,6 +132,10 @@ void Drive(void*) {
 			SetServoPos(0,nav.getSteer()); //Steer
 			SetServoPos(1,nav.getThrottle()); //Throttle
 		}
+		int switch3 = Utility::switchVal(GetADResult(3));
+		if (switch3 == -1) nav.navMethod = Nav::NavMethod::simpleWaypoint;
+		else if (switch3 == 0) nav.navMethod = Nav::NavMethod::followRightWall;
+		else nav.navMethod = Nav::NavMethod::followPath;
 		nav.navUpdate();
 		OSTimeDly(TICKS_PER_SECOND/10);
 	}

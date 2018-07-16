@@ -14,8 +14,9 @@
 //initiates constant lidar data gathering via PWM, timer2=left lidar, timer3=right lidar
 //calls GlobalTimerInit for both timers
 void LidarPWMInit();
-double getLeftLidar(); //returns distance in ft
-double getRightLidar(); //returns distance in ft
+void LidarPWMInitOld();
+double getLeftLidar(); //returns distance in cm
+double getRightLidar(); //returns distance in cm
 
 void GlobalTimerInit(int timerNum);
 

@@ -21,6 +21,8 @@ namespace Utility {
 	//Depressed green button produces ADC count of 0, undepressed in 32000s
 	//Returns -1 if left or depressed, 0 if middle, 1 if right or undepressed
 	int switchVal(int ADCCount);
+
+	float cmToFt(float cm);
 }
 
 

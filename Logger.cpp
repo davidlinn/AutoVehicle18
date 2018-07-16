@@ -16,6 +16,9 @@
 #include <ucos.h>
 #include <constants.h>
 #include "VehDefs.h"
+#include "Drivers/SpinningLidar.h"
+#include "Drivers/LidarPWM.h"
+#include <c++/5.2.0/string>
 
 extern Odometer odo;
 extern Nav nav;
@@ -29,6 +32,8 @@ float_element x{"x"};
 float_element y{"y"};
 float_element v{"v"};
 int_element finished{"finished"};
+float_element rightLidar{"rightLidar"};
+SPINNING_LIDAR_LOG_DEF
 END_INTRO_OBJ;
 
 MainLogObject mainLog;
@@ -45,6 +50,8 @@ void Logger::logLoop(void*) {
 			mainLog.y=nav.getY();
 			mainLog.v=nav.getV();
 			mainLog.finished=(int)nav.isFinished();
+			mainLog.rightLidar=getRightLidar(); //distance in feet
+			SPINNING_LIDAR_LOG_UPDATE
 			USER_EXIT_CRITICAL()
 			mainLog.Log();
 		}
