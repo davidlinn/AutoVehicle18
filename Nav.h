@@ -31,7 +31,7 @@ public:
 	float getSteer();
 	float getThrottle();
 //Steer-related
-	float waypointSteer();
+	float headingSteer();
 	float followRightWallSteer();
 	float wallUpdate(); //updates wall estimates and returns difference between ests in ft
 	float followPathSteer();
@@ -43,7 +43,7 @@ public:
 	Path shortestPath(int x, int y); //returns the shortest path to a waypoint using A*
 		//returns the heading that follows path of least potential
 	float artificialPotentialWithMap(); //using map
-	float artificialPotentialLidarScan(); //using several Lidar scans
+	float artificialPotential(); //using one lidar scan
 //State
 	enum NavMethod {
 		simpleWaypoint, //navigates to a waypoint by minimizing error between heading and heading_des

@@ -30,6 +30,10 @@
 #include "Drivers/pwm.h"
 #include <SimpleAD.h>
 #include <Boot_Settings.h>
+#include <math.h>
+#include "Profiler.h"
+#include <constants.h>
+#include "FastMath.h"
 LOGFILEINFO;
 
 extern "C" {
@@ -45,10 +49,23 @@ OS_SEM MainTaskSem; //Semaphore: the function that has this gets to run
 LCD lcd; //LCD object, reinstantiated in init()
 Odometer odo; //Global odometer object, reinstantiated in init()
 MPU9250 imu; //Global imu object, reinstantiated in init()
-Nav nav; //Constructor does nothing
+Nav nav FAST_USER_VAR; //Constructor does nothing
+Path mainPath;
 NV_SettingsStruct NV_Settings;
+HiResTimer* globalTimer; //global read-only timer
+//float sinTable[360];
+//float fastCos(int i) {
+//	if (i < 90) i += 360;
+//	return sinTable[i-90];
+//}
 
 void init() {
+	//Math
+	//for (int i = 0; i < 360; ++i)
+	//	sinTable[i] = sin(i);
+	setupFastMath();
+	//testFastMath2();
+
 	//Display
 	Pins[38].function(PIN_38_UART5_TXD); //TX to Serial LCD
 	lcd = LCD(LCD_PORT,9600); //Reinstantiates global lcd on serial port defined in VehDefs.h w/ baud rate 9600
@@ -61,20 +78,29 @@ void init() {
 
 	//I2C (communication used for IMU)
 	MultiChannel_I2CInit();
-	//IMU
+	//IMU: Do not initialize global timer before this
 	Pins[27].function(PIN_27_I2C0_SCL    );//I2C for IMU
 	Pins[29].function(PIN_29_I2C0_SDA    );//I2C For IMU
-	Pins[50].hiz();
-	Pins[50].function(PIN_50_IRQ2  ); //IRQ for IMU
+	//Pins[50].hiz();
+	//Pins[50].function(PIN_50_IRQ2  ); //IRQ for IMU
 	imu = MPU9250(50); //reconstruct MPU9250 object on interrupt pin 50 (interrupt pin goes high when new data available)
 	OSTimeDly(3); //delay 3 ticks to give IMU time to set up its registers
 	IMUSetup();
 
-	//Side LiDARs: Do immediately after IMU because this also initializes DMA Timers
-	// 2 & 3, which RC relies on but IMU setup uses
+	//Global Timer (make sure this is AFTER IMU SETUP
+	//globalTimer = HiResTimer::getHiResTimer(GLOBAL_TIMER);
+	//globalTimer->init();
+	//globalTimer->start();
+
+	//Side LiDARs
 	Pins[23].function(PIN_23_T2IN); //LIDAR pulse left / Timer 2 in
-	Pins[25].function(PIN_25_T3IN); //LIDAR pulse right / Timer 3 in
-	LidarPWMInitOld(); //initializes both side LIDARS and global timers
+	//Pins[25].function(PIN_25_T3IN); //LIDAR pulse right / Timer 3 in
+	LidarPWMInit(); //initializes both side LIDARS and global timers
+	OSTimeDly(TICKS_PER_SECOND);
+	for (int i = 0; i <10;++i) {
+		printf("\nRight Lidar Val: %f\n",getRightLidar());
+		OSTimeDly(TICKS_PER_SECOND);
+	}
 
 	//RC
 	Pins[14].function(PIN_14_UART6_RXD);	//RC RX
@@ -109,17 +135,18 @@ void LCDUpdate(void*) {
 		char buf[32];
 		//Nav
 		if (!nav.isFinished())
-			sprintf(buf,"x:%3.1f,y:%3.1f,rwe:%3.1f,herr:%3.1f",nav.getX(),nav.getY(),nav.getRightWallEst(),nav.getHeadError());
-		else sprintf(buf,":) x:%4.2f,y:%4.2f",nav.getX(),nav.getY());
+			sprintf(buf,"x:%3.1f,y:%3.1f,h:%3.1f,h_des:%3.1f",nav.getX(),nav.getY(),getHeading(),nav.getHeadDes());
+		else sprintf(buf,":) x:%3.1f,y:%3.1f,h:%3.1f",nav.getX(),nav.getY(),getHeading());
 		lcd.print(buf,32);
-		printf("Right Lidar: %f, Heading: %f\n", getRightLidar(), getHeading());
 		StartAD(); //Updates analog to digital converter so other functions can read switches
+		printf("\nSpLidar[0]:%f,Right Lidar Val: %f\n",SpinningLidar::dist[0],getRightLidar());
 		OSTimeDly(TICKS_PER_SECOND/2); //delay .5s
 	}
 }
 
 void Drive(void*) {
 	while (1) {
+		Profiler::tic(3);
 		if (Utility::mode()==1) { //Fully manual
 			SetServoPos(0,HiCon(rc_ch[1])); //Steer
 			SetServoRaw(1,rc_ch[2]); //Throttle
@@ -137,6 +164,16 @@ void Drive(void*) {
 		else if (switch3 == 0) nav.navMethod = Nav::NavMethod::followRightWall;
 		else nav.navMethod = Nav::NavMethod::followPath;
 		nav.navUpdate();
+
+		/*//Build path
+		switch (rc_ch[6]) {
+		case 1: mainPath = Path(); break; //reset path
+		case 2: Path::Coordinate c; //add coordinate to path
+		c.x=nav.getX(); c.y=nav.getY();
+		mainPath.addToPath(c); break;
+		default: break;
+		}*/
+		Profiler::toc(3);
 		OSTimeDly(TICKS_PER_SECOND/10);
 	}
 }
@@ -163,7 +200,7 @@ void UserMain(void * pd) {
     iprintf("Application started\n");
     CheckNVSettings();
     init();
-    IMURun();
+    //IMURun();
     bLog = true;
     Logger::logBegin();
 
@@ -171,10 +208,16 @@ void UserMain(void * pd) {
     OSSimpleTaskCreatewName(LCDUpdate,LCD_PRIO,"LCD Update");
 
     //Servo Vals Update Task
-    OSSimpleTaskCreatewName(Drive,DRIVE_PRIO,"Drive");
+    OSSimpleTaskCreatewNameSRAM(Drive,DRIVE_PRIO,"Drive");
 
     //Top LIDAR Task
-    SpinningLidar::SpinningLidarInit(); //start top LIDAR serial read and processing task
+    //SpinningLidar::SpinningLidarInit(); //start top LIDAR serial read and processing task
+
+    //Profiling
+    //OSTimeDly(TICKS_PER_SECOND*3);
+    //Profiler::start();
+	//OSTimeDly(15*TICKS_PER_SECOND);
+	//Profiler::stop();
 
     while (1) {
     	OSTimeDly(TICKS_PER_SECOND);

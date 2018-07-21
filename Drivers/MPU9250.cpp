@@ -22,7 +22,7 @@
 
 MPU9250::MPU9250(uint8_t intPin)
 {
-  _intPin = intPin;
+  //_intPin = intPin;
   timer = HiResTimer::getHiResTimer(IMU_TIMER);
   if (timer == nullptr)
 	  printf("HiResTimer not initialized\n");
@@ -363,7 +363,7 @@ void MPU9250::magcalMPU9250(float * dest1, float * dest2)
       if(mag_temp[jj] > mag_max[jj]) mag_max[jj] = mag_temp[jj];
       if(mag_temp[jj] < mag_min[jj]) mag_min[jj] = mag_temp[jj];
     }
-    if(_Mmode == 0x02) timer->delay(.135);  // at 8 Hz ODR, new mag data is available every 125 ms
+    if(_Mmode == 0x02) timer->delay(.135);  // .135 at 8 Hz ODR, new mag data is available every 125 ms
     if(_Mmode == 0x06) timer->delay(.012);  // at 100 Hz ODR, new mag data is available every 10 ms
     }
 

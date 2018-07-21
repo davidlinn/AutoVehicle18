@@ -28,6 +28,10 @@
 #define IMU_TIMER 3 //Read current time only
 #define GLOBAL_TIMER 3 //Read current time only
 
+//PIT Timers
+#define IMU_PIT_TIMER 1
+#define SP_LIDAR_PIT_TIMER 2
+
 //UART Ports
 #define LCD_PORT 5
 #define RC_PORT 6

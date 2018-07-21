@@ -15,20 +15,22 @@
 #include "VehDefs.h"
 #include <iosys.h>
 #include <math.h>
+#include "Profiler.h"
+#include <pitr_sem.h>
 
 namespace SpinningLidar {
 	//Global members
-	volatile double dist[360];
-	volatile int sampleQuality[360];
+	volatile double dist[360] FAST_USER_VAR;
+	volatile int sampleQuality[360] FAST_USER_VAR;
 	//Members not for use outside namespace
-	char lidar_buffer[128];
-	int rv; //num chars read
-	bool LIDARReset = false;
-	int charCount = 0;
-	unsigned char packet[5];
+	char lidar_buffer[128] FAST_USER_VAR;
+	int rv FAST_USER_VAR; //num chars read
+	bool LIDARReset FAST_USER_VAR = false;
+	int charCount FAST_USER_VAR = 0;
+	unsigned char packet[5] FAST_USER_VAR;
 
 	void SpinningLidarInit() {
-		OSSimpleTaskCreatewName(LidarTask,SPINNING_LIDAR_PRIO,"LIDARTask");
+		OSSimpleTaskCreatewNameSRAM(LidarTask,SPINNING_LIDAR_PRIO,"LIDARTask");
 	}
 
 	int checkHealth(int fds) {
@@ -137,10 +139,16 @@ namespace SpinningLidar {
 		}
 		OSTimeDly(150);*/
 
+		OS_SEM SpLidarSem;
+		InitPitOSSem(SP_LIDAR_PIT_TIMER, &SpLidarSem, 80); //run at 80Hz
 		while (1) {
+			SpLidarSem.Pend();
 			rv = read(fds,lidar_buffer,128);
-			for (int j = 0; j < rv; ++j)
+			Profiler::tic(6);
+			for (int j = 0; j < rv; ++j) {
 				processChar(fds,lidar_buffer[j]);
+			}
+			Profiler::toc(6);
 		}
 	}
 }//end namespace

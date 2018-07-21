@@ -34,9 +34,13 @@
 #include <SimpleAD.h>
 #include <Boot_Settings.h>
 #include <system.h>
+#include "Profiler.h"
+#include <pitr_sem.h>
 
 #define SerialDebug 0
 #define CALIBGA 1 //set to 1 to recalibrate gyro and accelerometer
+
+extern HiResTimer* globalTimer;
 
 // Specify sensor full scale
 uint8_t Gscale = GFS250DPS;
@@ -46,7 +50,7 @@ uint8_t Mmode = 0x06;        // 2 for 8 Hz, 6 for 100 Hz continuous magnetometer
 float aRes, gRes, mRes;      // scale resolutions per LSB for the sensors
   
 // Pin definitions
-int intPin = 50;
+//int intPin FAST_USER_VAR = 50;
 volatile bool newData = false;
 bool newMagData = false;
 
@@ -80,7 +84,7 @@ float a12, a22, a31, a32, a33;            // rotation matrix coefficients for Eu
 double currenttime, deltat, lasttime, sum;  //for timing integration interval
 float zeroOffset; //offset created by zeroing heading
 
-float ax, ay, az, gx, gy, gz, mx, my, mz; // variables to hold latest sensor data values 
+float ax, ay, az, gx, gy, gz, mx, my, mz; // variables to hold latest sensor data values
 float lin_ax, lin_ay, lin_az;             // linear acceleration (acceleration with gravity component subtracted)
 float q[4] = {1.0f, 0.0f, 0.0f, 0.0f};    // vector to hold quaternion
 float eInt[3] = {0.0f, 0.0f, 0.0f};       // vector to hold integral error for Mahony method
@@ -142,8 +146,8 @@ void IMUSetup()
 	  printf("\nZ-Axis sensitivity adjustment value "); printf("%f\n",magCalibration[2]);
 	  OSTimeDly(TICKS_PER_SECOND);
   }
-  //HiResTimer* filtertimer = HiResTimer::getHiResTimer(IMU_TIMER);
-  //filtertimer->init();
+  //HiResTimer* globalTimer = HiResTimer::getHiResTimer(IMU_TIMER);
+  //globalTimer->init();
 }
 
 void CalibAccAndGyro() {
@@ -164,20 +168,21 @@ void CalibAccAndGyro() {
 }
 
 //-----Task Management----
-OS_SEM PirqSem;
-volatile uint32_t PirqCount;
-void Pirq(void)
-{
-PirqSem.Post();
-PirqCount++;
-}
+//OS_SEM PirqSem FAST_USER_VAR;
+//void Pirq(void)
+//{
+//PirqSem.Post();
+//}
 //-----------------------
 
 void IMUSampleLoop(void*) {
-	HiResTimer* filtertimer = HiResTimer::getHiResTimer(IMU_TIMER); //global read-only timer
-	//filtertimer->start();
+	//HiResTimer* globalTimer = HiResTimer::getHiResTimer(IMU_TIMER); //global read-only timer
+	OS_SEM IMUSem;
+	InitPitOSSem(IMU_PIT_TIMER, &IMUSem, 66); //run at 66Hz
 	while (1) {
-		PirqSem.Pend(); //Wait for a call to PirqSem.Post()
+		IMUSem.Pend(); //Wait for a call to PirqSem.Post()
+		//iprintf("Running IMU loop, sum: %f\n",sum);
+		//Profiler::tic(5);
 		// If we get here, interrupt pin just went high because there was new data to be read
 		imu.readMPU9250Data(MPU9250Data); // interrupt cleared (goes low) on any read
 		//   readAccelData(accelCount);  // Read the x/y/z adc values
@@ -201,9 +206,9 @@ void IMUSampleLoop(void*) {
 		mx *= magScale[0];
 		my *= magScale[1];
 		mz *= magScale[2];
-		currenttime = filtertimer->readTime();
+		currenttime = globalTimer->readTime();
 		deltat = currenttime - lasttime; // set integration time in seconds by time elapsed since last filter update
-		lasttime = filtertimer->readTime();
+		lasttime = globalTimer->readTime();
 
 		sum += deltat; // sum for averaging filter update rate
 		++sumCount;
@@ -217,8 +222,10 @@ void IMUSampleLoop(void*) {
 		// function to get North along the accel +x-axis, East along the accel -y-axis, and Down along the accel -z-axis.
 		// This orientation choice can be modified to allow any convenient (non-NED) orientation convention.
 		// Pass gyro rate as rad/s
+		//Profiler::tic(8);
 		Madge::MadgwickQuaternionUpdate(-ax, ay, az, gx * M_PI / 180.0f,
 				-gy * M_PI / 180.0f, -gz * M_PI / 180.0f, my, -mx, mz);
+		//Profiler::toc(8);
 		//  if(passThru)MahonyQuaternionUpdate(-ax, ay, az, gx*PI/180.0f, -gy*PI/180.0f, -gz*PI/180.0f,  my,  -mx, mz);
 		// Serial print and/or display at 0.5 s rate independent of data rates
 		if (sum > .5) { // update LCD once per half-second independent of read rate
@@ -318,6 +325,9 @@ void IMUSampleLoop(void*) {
 			sumCount = 0; //incremented each filter update, reset here every half-second or so
 			sum = 0; //sum of time intervals between filter updates, reset here every half-second or so
 		}
+		//Profiler::toc(5);
+		//delay 5ms to provide time for other tasks
+		//delaytimer->delay(.005);
 	}
 }
 
@@ -360,10 +370,10 @@ int whoAmICheck() { //Returns 0 for successful initialization, -1 for fail
 
 
 void IMURun() {
-    OSSimpleTaskCreatewName(IMUSampleLoop,IMU_PRIO,"IMU");
-	SetPinIrq(50, 1,Pirq);
-	Pins[50].function(PIN_50_IRQ2); //IRQ for IMU
-    PirqSem.Post();
+    OSSimpleTaskCreatewNameSRAM(IMUSampleLoop,IMU_PRIO,"IMU");
+	//SetPinIrq(50, 1,Pirq);
+	//Pins[50].function(PIN_50_IRQ2); //IRQ for IMU
+    //PirqSem.Post();
 }
 
 float getHeading() {

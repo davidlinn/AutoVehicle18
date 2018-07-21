@@ -13,8 +13,6 @@
 #include "Nav.h"
 
 static volatile uint32_t OdoCount;
-static volatile uint32_t DtOdoCount;
-static volatile uint32_t LastOdoTime;
 
 extern Nav nav;
 
@@ -44,20 +42,5 @@ void Odometer::resetCount() {
 }
 
 void Odometer::OdoIrq() {
-	uint32_t t=sim2.timer[3].tcn;
 	OdoCount++;
-
-	uint32_t dt;
-	if(t<LastOdoTime) {//Roll over every 34 sec or so...
-		dt=(t-0x80000000)-(LastOdoTime-0x80000000);
-	}
-	else {
-		dt=(t-LastOdoTime);
-	}
-	DtOdoCount=dt;
-	LastOdoTime=t;
-
-	//nav.navUpdate();
-
-	//MainTaskSem.Post();
 }

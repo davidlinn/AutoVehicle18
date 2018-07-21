@@ -16,13 +16,17 @@
 #include <intcdefs.h>
 #include <HiResTimer.h>
 #include "VehDefs.h"
+#include "Profiler.h"
+#include <constants.h>
 
 volatile static uint8_t bLIDAR_MODE_LEFT;
 volatile static uint32_t LIDAR_LAST_START_LEFT;
 volatile uint32_t LIDAR_VALUE_LEFT;
-volatile static uint8_t bLIDAR_MODE_RIGHT;
+volatile static int bLIDAR_MODE_RIGHT;
 volatile static uint32_t LIDAR_LAST_START_RIGHT;
-volatile uint32_t LIDAR_VALUE_RIGHT;
+volatile uint32_t LIDAR_VALUE_RIGHT FAST_USER_VAR;
+
+extern HiResTimer* globalTimer;
 
 //Left Interrupt
 /*INTERRUPT(LIDAR_ISR_LEFT,0x2700)
@@ -30,7 +34,7 @@ volatile uint32_t LIDAR_VALUE_RIGHT;
 	sim2.timer[2].ter=3;
 	if(bLIDAR_MODE_LEFT==1) //Just hit rising edge
 		{
-		sim2.timer[2].tmr=0x0083;   // 0000 0000 10 0 0 0 0 1 1 //Falling edge
+		sim2.timer[2].tmr=0x0083;   // 0000 0000 10 0 0 0 0 1 1 :Wait for Falling edge
 		LIDAR_LAST_START_LEFT=sim2.timer[2].tcr;
 		bLIDAR_MODE_LEFT=2;
 		}
@@ -38,7 +42,7 @@ volatile uint32_t LIDAR_VALUE_RIGHT;
 		if(bLIDAR_MODE_LEFT==2) //Just hit falling edge
 		{
 
-			sim2.timer[2].tmr=0x0043;   // 0000 0000 01 0 0 0 0 1 1 //Rising edge
+			sim2.timer[2].tmr=0x0043;   // 0000 0000 01 0 0 0 0 1 1 :Wait for Rising edge
 			bLIDAR_MODE_LEFT=1;
 			uint32_t v=sim2.timer[2].tcr;
 #ifndef SIM
@@ -46,8 +50,6 @@ volatile uint32_t LIDAR_VALUE_RIGHT;
 #endif
 		}
 }*/
-
-HiResTimer* rightTimer;
 
 //Right Interrupt
 INTERRUPT(LIDAR_ISR_RIGHT,0x2700)
@@ -71,37 +73,7 @@ INTERRUPT(LIDAR_ISR_RIGHT,0x2700)
 		}
 }
 
-void rightLidarUpdate() {
-	sim2.timer[3].ter=3;
-	if(bLIDAR_MODE_RIGHT==1) //Just hit rising edge
-		{
-		sim2.timer[3].tmr=0x0083;   // 0000 0000 10 0 0 0 0 1 1 //Falling edge
-		LIDAR_LAST_START_RIGHT=sim2.timer[3].tcr;
-		bLIDAR_MODE_RIGHT=2;
-		}
-	else
-		if(bLIDAR_MODE_RIGHT==2) //Just hit falling edge
-		{
-			sim2.timer[3].tmr=0x0043;   // 0000 0000 01 0 0 0 0 1 1 //Rising edge
-			bLIDAR_MODE_RIGHT=1;
-			uint32_t v=sim2.timer[3].tcr;
-#ifndef SIM
-			LIDAR_VALUE_RIGHT=(v-LIDAR_LAST_START_RIGHT);
-#endif
-		}
-}
-
 void LidarPWMInit() {
-	rightTimer = HiResTimer::getHiResTimer(RIGHTLIDAR_TIMER);
-	rightTimer->init();
-	rightTimer->setInterruptFunction(rightLidarUpdate);
-	sim2.timer[3].ter=3;
-	sim2.timer[3].tmr=0x0043;   // 0000 0000 01 0 0 0 0 1 1 //Rising edge
-	bLIDAR_MODE_RIGHT=1;
-	rightTimer->start();
-}
-
-void LidarPWMInitOld() {
 	//left
 	//GlobalTimerInit(2);
 	//SETUP_DMATIMER2_ISR(&LIDAR_ISR_LEFT,2);
@@ -112,16 +84,15 @@ void LidarPWMInitOld() {
 	bLIDAR_MODE_RIGHT=1;
 }
 
-void GlobalTimerInit(int timerNum)
-{
+void GlobalTimerInit(int timerNum) {
 	printf("Initialized global timer %i\n", timerNum);
 	sim2.timer[timerNum].txmr=0;
 	sim2.timer[timerNum].ter=3;
 	sim2.timer[timerNum].trr=0;
 	sim2.timer[timerNum].tcr=0;
 	sim2.timer[timerNum].tcn=0;
-	sim2.timer[timerNum].ter=3;
-	sim2.timer[timerNum].tmr=0x0043;   // 0000 0000 01 0 0 0 0 1 1 //Rising edge
+	sim2.timer[timerNum].ter=3;        //           00 0 1 1 00 1 init_ticks tmr
+	sim2.timer[timerNum].tmr=0x0043;   // 0000 0000 01 0 0 0 01 1 //Rising edge
 }
 
 double getLeftLidar() {

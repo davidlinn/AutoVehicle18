@@ -20,12 +20,17 @@
 #include <SimpleAD.h>
 #include "Drivers/SpinningLidar.h"
 #include "Drivers/LidarPWM.h"
+#include "utils.h"
+#include "Profiler.h"
+#include "FastMath.h"
 
 #define K_P_STEER .01
 #define K_P_WALLFOLLOW (1./40.)
 #define BRAKE_PWR -.5 //more neg equals more pwr
 
 extern Odometer odo;
+extern float fastCos(int i);
+extern float sinTable[360];
 
 Nav::Nav() {}
 Nav::~Nav() {}
@@ -40,6 +45,7 @@ float Nav::getHeadError() {return headError;}
 //MAIN NAVIGATION METHODS
 
 void Nav::navUpdate() {
+	//Profiler::tic(2);
 	if (Utility::switchVal(GetADResult(1))==-1) { //if first switch is in the left position
 		x = 0; y = 0; //reset coordinates
 		rightWallEst = getRightLidar();
@@ -70,8 +76,9 @@ void Nav::navUpdate() {
 	//Save current heading and odometer
 	lastHeading = getHeading();
 	lastOdo = odo.getCount();
-	//Calculate desired heading
+	//Calculate desired heading, simply and then adding artificial potential field
 	heading_des = (180./M_PI)*atan2(y_des-y,x_des-x);
+	//heading_des = artificialPotential();
 
 	//FOR WALL FOLLOWING
 	//Update walls and error in heading if we moved
@@ -79,12 +86,12 @@ void Nav::navUpdate() {
 		diff = wallUpdate(); //difference in estimates in feet
 		headError = (180./M_PI)*asin(diff/feetTraveled); //in degrees
 	}
-
+	//Profiler::toc(2);
 }
 
 float Nav::getSteer() { //1 left, -1 right. getSteer() must also provide a value for forward
 	switch (navMethod) {
-	case simpleWaypoint: return waypointSteer();
+	case simpleWaypoint: return headingSteer();
 	case followRightWall: return followRightWallSteer();
 	case followPath: return followPathSteer();
 	}
@@ -102,13 +109,15 @@ float Nav::getThrottle() {
 
 //STEERING-RELATED METHODS
 
-float Nav::waypointSteer() {
+float Nav::headingSteer() {
+	Profiler::tic(0);
 	float error = Utility::degreeWrap(heading_des-lastHeading);
 	if (error>90 || error<-90) {
 		forward = -1;
 		error = Utility::degreeWrap(error-180); //calculate error as if car was flipped
 	}
 	else forward = 1;
+	Profiler::toc(0);
 	return forward*K_P_STEER*error;
 }
 
@@ -137,6 +146,25 @@ float Nav::wallUpdate() { //updates wall estimates and returns difference betwee
 
 float Nav::followPathSteer() {
 	return 0;
+}
+
+float Nav::artificialPotential() {
+	float SOURCEMAG = 20;
+	float x0,y0;
+	float mag;
+	int dir;
+	for (int i = 0; i < 360; i+=2) {
+		if (SpinningLidar::dist[i] > 1) {
+			dir = Utility::degreeWrap(-i-90+lastHeading); //direction of "force"
+			mag = SpinningLidar::dist[i]; // 1/r^2
+			mag = SpinningLidar::sampleQuality[i]/pow(mag,2);
+			x0 += mag*fastcos(dir);
+			y0 += mag*fastsin(dir);
+		}
+	}
+	x0 += SOURCEMAG*fastcos(heading_des);
+	y0 += SOURCEMAG*fastsin(heading_des);
+	return (180./M_PI)*atan2(y0,x0); //in degrees
 }
 
 //THROTTLE-RELATED METHODS

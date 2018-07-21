@@ -10,6 +10,7 @@
 #define LIDARPWM_H_
 
 #include <basictypes.h>
+#include <constants.h>
 
 //initiates constant lidar data gathering via PWM, timer2=left lidar, timer3=right lidar
 //calls GlobalTimerInit for both timers
@@ -17,7 +18,6 @@ void LidarPWMInit();
 void LidarPWMInitOld();
 double getLeftLidar(); //returns distance in cm
 double getRightLidar(); //returns distance in cm
-
+double getLidarInfo();
 void GlobalTimerInit(int timerNum);
-
 #endif /* LIDARPWM_H_ */
