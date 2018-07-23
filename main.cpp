@@ -50,7 +50,7 @@ OS_SEM MainTaskSem; //Semaphore: the function that has this gets to run
 LCD lcd; //LCD object, reinstantiated in init()
 Odometer odo; //Global odometer object, reinstantiated in init()
 MPU9250 imu; //Global imu object, reinstantiated in init()
-Nav nav FAST_USER_VAR; //Constructor does nothing
+Nav nav; //Constructor does nothing
 Path mainPath;
 NV_SettingsStruct NV_Settings;
 

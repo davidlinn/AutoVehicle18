@@ -7,6 +7,7 @@
 
 #include "Map.h"
 
+
 Map::Map() {
 	// TODO Auto-generated constructor stub
 
@@ -14,4 +15,8 @@ Map::Map() {
 
 Map::~Map() {
 	// TODO Auto-generated destructor stub
+}
+
+void Map::featureUpdate() {
+
 }

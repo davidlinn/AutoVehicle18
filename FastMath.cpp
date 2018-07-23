@@ -120,7 +120,7 @@ float fixedToFloat(int fixed) {
 
 float Zto360Wrap(float deg) {
 	while (deg < 0) deg += 360;
-	while (deg > 360) deg -= 360;
+	while (deg >= 360) deg -= 360;
 	return deg;
 }
 int FixZto360Wrap(int deg) {
