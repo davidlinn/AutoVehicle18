@@ -40,7 +40,8 @@
 #define SerialDebug 0
 #define CALIBGA 1 //set to 1 to recalibrate gyro and accelerometer
 
-extern HiResTimer* globalTimer;
+HiResTimer* globalTimer = HiResTimer::getHiResTimer(GLOBAL_TIMER); //Only use during setup, will not work in IMUSampleLoop
+extern double getGlobalTime(); //Use during IMUSampleLoop
 
 // Specify sensor full scale
 uint8_t Gscale = GFS250DPS;
@@ -129,9 +130,6 @@ void IMUSetup()
 	  SaveUserParameters(&NV_Settings, sizeof(NV_Settings));
 
 	  lcd.clear();
-	  printf("\nAK8963 mag biases (mG)"); printf(" %f",magBias[0]); printf(" %f",magBias[1]); printf(" %f",magBias[2]);
-	  printf("\nAK8963 mag scale (mG)"); printf(" %f",magScale[0]); printf(" %f",magScale[1]); printf(" %f",magScale[2]);
-	  OSTimeDly(TICKS_PER_SECOND); // add delay to see results before serial spew of data
   }
   else {
 	  //Load calibration from boot memory
@@ -140,14 +138,16 @@ void IMUSetup()
 	  for (int i = 0; i < 3; ++i)
 		  magScale[i]=NV_Settings.magScale[i];
   }
+  //Print Mag Calibration
+  printf("\nAK8963 mag biases (mG)"); printf(" %f",magBias[0]); printf(" %f",magBias[1]); printf(" %f",magBias[2]);
+  printf("\nAK8963 mag scale (mG)"); printf(" %f",magScale[0]); printf(" %f",magScale[1]); printf(" %f",magScale[2]);
+  OSTimeDly(TICKS_PER_SECOND); // add delay to see results before serial spew of data
   if(SerialDebug) {
 	  printf("\nX-Axis sensitivity adjustment value "); printf("%f",magCalibration[0]);
 	  printf("\nY-Axis sensitivity adjustment value "); printf("%f",magCalibration[1]);
 	  printf("\nZ-Axis sensitivity adjustment value "); printf("%f\n",magCalibration[2]);
 	  OSTimeDly(TICKS_PER_SECOND);
   }
-  //HiResTimer* globalTimer = HiResTimer::getHiResTimer(IMU_TIMER);
-  //globalTimer->init();
 }
 
 void CalibAccAndGyro() {
@@ -176,12 +176,11 @@ void CalibAccAndGyro() {
 //-----------------------
 
 void IMUSampleLoop(void*) {
-	//HiResTimer* globalTimer = HiResTimer::getHiResTimer(IMU_TIMER); //global read-only timer
 	OS_SEM IMUSem;
 	InitPitOSSem(IMU_PIT_TIMER, &IMUSem, 66); //run at 66Hz
 	while (1) {
 		IMUSem.Pend(); //Wait for a call to PirqSem.Post()
-		//iprintf("Running IMU loop, sum: %f\n",sum);
+		//printf("Running IMU loop, sum: %f\n",sum);
 		//Profiler::tic(5);
 		// If we get here, interrupt pin just went high because there was new data to be read
 		imu.readMPU9250Data(MPU9250Data); // interrupt cleared (goes low) on any read
@@ -206,9 +205,9 @@ void IMUSampleLoop(void*) {
 		mx *= magScale[0];
 		my *= magScale[1];
 		mz *= magScale[2];
-		currenttime = globalTimer->readTime();
+		currenttime = getGlobalTime();
 		deltat = currenttime - lasttime; // set integration time in seconds by time elapsed since last filter update
-		lasttime = globalTimer->readTime();
+		lasttime = currenttime;
 
 		sum += deltat; // sum for averaging filter update rate
 		++sumCount;

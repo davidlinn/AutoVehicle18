@@ -69,7 +69,7 @@ private:
 	float lastv;
 	float distTraveled;
 //Time
-	HiResTimer* navtimer = HiResTimer::getHiResTimer(GLOBAL_TIMER);
+	double currenttime;
 	double lastnavupdate;
 	double deltat;
 //Orientation

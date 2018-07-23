@@ -18,6 +18,7 @@ void LidarPWMInit();
 void LidarPWMInitOld();
 double getLeftLidar(); //returns distance in cm
 double getRightLidar(); //returns distance in cm
-double getLidarInfo();
+int getGlobalTimerOverflow();
 void GlobalTimerInit(int timerNum);
+
 #endif /* LIDARPWM_H_ */

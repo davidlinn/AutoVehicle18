@@ -29,8 +29,7 @@
 #define BRAKE_PWR -.5 //more neg equals more pwr
 
 extern Odometer odo;
-extern float fastCos(int i);
-extern float sinTable[360];
+extern double getGlobalTime();
 
 Nav::Nav() {}
 Nav::~Nav() {}
@@ -54,8 +53,9 @@ void Nav::navUpdate() {
 		return;
 	}
 	//Record time since last update
-	deltat = navtimer->readTime()-lastnavupdate;
-	lastnavupdate = navtimer->readTime();
+	currenttime = getGlobalTime();
+	deltat = currenttime-lastnavupdate;
+	lastnavupdate = currenttime;
 	//Save previous coordinates
 	lastx = x;
 	lasty = y;
@@ -63,12 +63,12 @@ void Nav::navUpdate() {
 	double headingAverage = (getHeading()+lastHeading)/2;
 	double feetTraveled = Utility::odoToFeet(odo.getCount()-lastOdo);
 	if (getServoPos(1)>-.005) { //moving forward
-		x += feetTraveled*cos(headingAverage*M_PI/180.);
-		y += feetTraveled*sin(headingAverage*M_PI/180.);
+		x += feetTraveled*fastcos(headingAverage*M_PI/180.);
+		y += feetTraveled*fastsin(headingAverage*M_PI/180.);
 	}
 	else { //moving backward
-		x -= feetTraveled*cos(headingAverage*M_PI/180.);
-		y -= feetTraveled*sin(headingAverage*M_PI/180.);
+		x -= feetTraveled*fastcos(headingAverage*M_PI/180.);
+		y -= feetTraveled*fastsin(headingAverage*M_PI/180.);
 	}
 	//Calculate velocity
 	lastv = v;

@@ -1,5 +1,5 @@
 /*
- * FastMath.h
+ * FastMath.h: NOT ALL FUNCS HAVE BEEN IMPLEMENTED
  *
  *  Created on: Jul 18, 2018
  *      Author: NetBurner

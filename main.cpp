@@ -34,6 +34,7 @@
 #include "Profiler.h"
 #include <constants.h>
 #include "FastMath.h"
+#include <sim.h>
 LOGFILEINFO;
 
 extern "C" {
@@ -52,17 +53,17 @@ MPU9250 imu; //Global imu object, reinstantiated in init()
 Nav nav FAST_USER_VAR; //Constructor does nothing
 Path mainPath;
 NV_SettingsStruct NV_Settings;
-HiResTimer* globalTimer; //global read-only timer
-//float sinTable[360];
-//float fastCos(int i) {
-//	if (i < 90) i += 360;
-//	return sinTable[i-90];
-//}
+
+//Global Time
+double getGlobalTime() {
+	return ((double) TIME_PER_CLK * ( // How long is a clock cycle?
+			(double) sim2.timer[3].tcn + (  // The count of the current DMA count register
+	        (double) getGlobalTimerOverflow() * ( // How many times have we reset?
+	        (double) sim2.timer[3].trr + 1.0 )))); // What is the overflow value?
+}
 
 void init() {
 	//Math
-	//for (int i = 0; i < 360; ++i)
-	//	sinTable[i] = sin(i);
 	setupFastMath();
 	//testFastMath2();
 
@@ -87,20 +88,15 @@ void init() {
 	OSTimeDly(3); //delay 3 ticks to give IMU time to set up its registers
 	IMUSetup();
 
-	//Global Timer (make sure this is AFTER IMU SETUP
-	//globalTimer = HiResTimer::getHiResTimer(GLOBAL_TIMER);
-	//globalTimer->init();
-	//globalTimer->start();
-
 	//Side LiDARs
 	Pins[23].function(PIN_23_T2IN); //LIDAR pulse left / Timer 2 in
-	//Pins[25].function(PIN_25_T3IN); //LIDAR pulse right / Timer 3 in
+	Pins[25].function(PIN_25_T3IN); //LIDAR pulse right / Timer 3 in
 	LidarPWMInit(); //initializes both side LIDARS and global timers
 	OSTimeDly(TICKS_PER_SECOND);
-	for (int i = 0; i <10;++i) {
-		printf("\nRight Lidar Val: %f\n",getRightLidar());
-		OSTimeDly(TICKS_PER_SECOND);
-	}
+	//for (int i = 0; i <10;++i) {
+	//	printf("\nRight Lidar Val: %f\n",getRightLidar());
+	//	OSTimeDly(TICKS_PER_SECOND);
+	//}
 
 	//RC
 	Pins[14].function(PIN_14_UART6_RXD);	//RC RX
@@ -139,7 +135,7 @@ void LCDUpdate(void*) {
 		else sprintf(buf,":) x:%3.1f,y:%3.1f,h:%3.1f",nav.getX(),nav.getY(),getHeading());
 		lcd.print(buf,32);
 		StartAD(); //Updates analog to digital converter so other functions can read switches
-		printf("\nSpLidar[0]:%f,Right Lidar Val: %f\n",SpinningLidar::dist[0],getRightLidar());
+		printf("\nSpLidar[0]:%f,Heading:%f,Right Lidar Val:%f,GlobalTimerTime:%f,%i\n",SpinningLidar::dist[0],getHeading(),getRightLidar(),getGlobalTime(),getGlobalTimerOverflow());
 		OSTimeDly(TICKS_PER_SECOND/2); //delay .5s
 	}
 }
@@ -200,7 +196,7 @@ void UserMain(void * pd) {
     iprintf("Application started\n");
     CheckNVSettings();
     init();
-    //IMURun();
+    IMURun();
     bLog = true;
     Logger::logBegin();
 
@@ -211,7 +207,7 @@ void UserMain(void * pd) {
     OSSimpleTaskCreatewNameSRAM(Drive,DRIVE_PRIO,"Drive");
 
     //Top LIDAR Task
-    //SpinningLidar::SpinningLidarInit(); //start top LIDAR serial read and processing task
+    SpinningLidar::SpinningLidarInit(); //start top LIDAR serial read and processing task
 
     //Profiling
     //OSTimeDly(TICKS_PER_SECOND*3);

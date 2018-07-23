@@ -27,10 +27,8 @@ void testFastMath() {
 	t->start();
 	float a, b;
 	Profiler::start();
-	Profiler::tic(1);
 	for (int i = 0; i < 10; ++i)
 		a = sin(i*M_PI/360.);
-	Profiler::toc(1);
 	Profiler::tic(2);
 	for (int i = 0; i < 10; ++i)
 		b = fastsin(i);
@@ -98,7 +96,7 @@ void testFastMath2() {
 	b = pow(10,4);
 	Profiler::toc(5);
 	Profiler::tic(6);
-	b = c[5];
+	b = c[4];
 	Profiler::toc(6);
 	Profiler::stop();
 }

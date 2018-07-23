@@ -36,8 +36,8 @@ void RC_ProcessChars( int num, uint8_t c )
 static uint32_t lt;
 static uint8_t lc;
 static int state;
-//uint32_t t=sim2.timer[3].tcn;
-/*uint32_t dt;
+uint32_t t=sim2.timer[3].tcn;
+uint32_t dt;
 if(t<lt)
 {//Roll over every 34 sec or so...
  dt=(t-0x80000000)-(lt-0x80000000);
@@ -45,9 +45,7 @@ if(t<lt)
 else
 {
 dt=(t-lt);
-}*/
-double t= globalTimer->readTime();
-double dt = globalTimer->readTime()-lt;
+}
 
 //4 msec
 //16 msec
@@ -56,8 +54,7 @@ double dt = globalTimer->readTime()-lt;
 //4 msec 500000
 //16 msec = 2000000
 
-//if ((dt>500000) && (dt<2000000))
-if (dt>.004 && dt<.016) {
+if ((dt>500000) && (dt<2000000)) {
 	RCFrameCnt++;
 	state=1;
 }
