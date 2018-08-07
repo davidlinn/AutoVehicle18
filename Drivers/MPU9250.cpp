@@ -1,10 +1,6 @@
 /*  Driver for MPU9250
  *  Created by Kris Winer ; Ported to Netburner 2.8/3.0 by David Linn
- *  Can be ported to other platforms by switching out timing/delay I2C communication functions
- Demonstrate basic MPU-9250 functionality including parameterizing the register addresses, initializing the sensor, 
- getting properly scaled accelerometer, gyroscope, and magnetometer data out.
- 
- Library may be used freely and without limit with attribution.
+ *  Library may be used freely and without limit with attribution.
 */
 
 #include "MPU9250.h"

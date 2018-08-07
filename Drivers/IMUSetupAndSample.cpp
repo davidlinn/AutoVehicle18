@@ -1,11 +1,11 @@
-/* MPU9250 Basic Functionality
- Most implementation by Kris Winer ; Ported to Netburner 2.8/3.0 by David Linn
+/* MPU9250
+ Most implementation by Kris Winer ; Ported to NetBurner 2.8.6 with added features by David Linn
  date: 4/1/14 ; 6/8/18
  
  Demonstrate basic MPU-9250 functionality including parameterizing the register addresses, initializing the sensor, 
- getting properly scaled accelerometer, gyroscope, and magnetometer data out. Added display functions to 
- allow display to on breadboard monitor. Addition of 9 DoF sensor fusion using open source Madgwick algorithm.
- Designed to run on the Netburner NANO 54415.
+ getting properly scaled accelerometer, gyroscope, and magnetometer data out.
+ 9 DoF sensor fusion using open source Madgwick algorithm.
+ Tested on the NANO54415 with NetBurner 2.8.6.
  
  Hardware setup:
  MPU9250 Breakout --------- NANO
@@ -13,29 +13,39 @@
  VDDI --------------------- 3.3V
  SDA ----------------------- 29
  SCL ----------------------- 27
- INT ----------------------- 50
  GND ---------------------- GND
  */
+
 #include "IMUSetupAndSample.h"
+#include "MadgwickFilter.h"
+#include "MPU9250.h"
+
+//System includes
+#include <predef.h>
+#if (NNDK_MAJOR == 2)
+#include <ucos.h>
+#elif (NNDK_MAJOR == 3)
+#include <rtos.h>
+#else
+#error Check NNDK version compatibility with IMU code.
+#endif
 #include <multichanneli2c.h>
 #include <constants.h>
 #include <stdio.h>
 #include <nbtime.h>
 #include <basictypes.h>
-#include "Utility.h"
 #include <pins.h>
-#include <ucos.h>
 #include <pin_irq.h>
-#include "Math.h"
-#include "MPU9250.h"
-#include "MadgwickFilter.h"
-#include "VehDefs.h"
-#include "LCD.h"
+#include <math.h>
 #include <SimpleAD.h>
 #include <Boot_Settings.h>
 #include <system.h>
-#include "Profiler.h"
 #include <pitr_sem.h>
+
+//Includes for autonomous vehicle project
+#include "Utility.h"
+#include "VehDefs.h"
+#include "LCD.h"
 
 #define SerialDebug 0
 #define CALIBGA 1 //set to 1 to recalibrate gyro and accelerometer
@@ -93,7 +103,6 @@ float eInt[3] = {0.0f, 0.0f, 0.0f};       // vector to hold integral error for M
 extern MPU9250 imu; //Make sure global imu object gets initialized in main.cpp's init()
 extern LCD lcd;
 
-int whoAmICheck();
 void IMUSetup()
 {
 	if (whoAmICheck() == -1) return; //Fail initialization if whoAmICheck fails
@@ -166,14 +175,6 @@ void CalibAccAndGyro() {
 	printf("\ngyro biases (dps)"); printf(" %f",gyroBias[0]); printf(" %f",gyroBias[1]); printf(" %f",gyroBias[2]);
 	//OSTimeDly(TICKS_PER_SECOND);
 }
-
-//-----Task Management----
-//OS_SEM PirqSem FAST_USER_VAR;
-//void Pirq(void)
-//{
-//PirqSem.Post();
-//}
-//-----------------------
 
 void IMUSampleLoop(void*) {
 	OS_SEM IMUSem;
@@ -290,9 +291,6 @@ void IMUSampleLoop(void*) {
 			//Heading is defined for the Cartesian coordiate system, where 0 degrees points along the x-axis
 			//Heading increases in the counterclockwise direction
 			heading = Utility::degreeWrap(-yaw + 180 - 11.52); // Declination at San Diego, California is 11.52E on 6/8/18
-			//The following line assumes that the ADC is updated every so often by calling StartAD(): we do it in LCDUpdate()
-			if (zeroOffset==0 && Utility::switchVal(GetADResult(1))==1) //if heading hasn't been zeroed yet and first switch is in the right position
-				zeroHeading();
 			roll *= 180.0f / M_PI;
 			lin_ax = ax + a31;
 			lin_ay = ay + a32;
@@ -380,6 +378,7 @@ float getHeading() {
 }
 
 void zeroHeading() {
+	printf("Called zeroHeading()\n");
 	zeroOffset = heading;
 }
 

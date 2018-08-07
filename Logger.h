@@ -2,7 +2,7 @@
  * Logger.h
  *
  *  Created on: Jun 11, 2018
- *      Author: NetBurner
+ *      Author: David Linn
  */
 
 #ifndef LOGGER_H_

@@ -99,15 +99,16 @@ void GlobalTimerInit(int timerNum) {
 	sim2.timer[timerNum].tmr=0x0053;   // 0000 0000 01 0 0 0 01 1 //Rising edge
 }
 
-double getLeftLidar() {
+int getLeftLidar() {
 	//This calibration curve models the car as a point and assumes the LiDAR lens
-	//is 4 in away from the point. Add 1 for each cm the lens is mounted further
-	//from the center of the car. Likewise, subtract 1 for each cm the lens is mounted
+	//is 4 in away from the point. Add 1 for each mm the lens is mounted further
+	//from the center of the car. Likewise, subtract 1 for each mm the lens is mounted
 	//closer to the center of the car.
-	//Uncertainty is about 2.5 cm
-	return (LIDAR_VALUE_LEFT*.00079668)-3.97261;
+	//Uncertainty is about 25 mm
+	return (int)(LIDAR_VALUE_LEFT*.0079668)-40;
 }
 
-double getRightLidar() {
-	return (LIDAR_VALUE_RIGHT*.00079668)-3.97261;
+int getRightLidar() {
+	return (int)(LIDAR_VALUE_RIGHT*.0079668)-40;
 }
+//3.97261

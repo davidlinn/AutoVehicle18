@@ -20,7 +20,7 @@
 
 namespace SpinningLidar {
 	//Global members
-	volatile double dist[360] FAST_USER_VAR;
+	volatile int dist[360] FAST_USER_VAR;
 	volatile int sampleQuality[360] FAST_USER_VAR;
 	//Members not for use outside namespace
 	char lidar_buffer[128] FAST_USER_VAR;
@@ -102,7 +102,7 @@ namespace SpinningLidar {
 			//Save result
 			int index = (int)(round(a/64.))%360; //calculate angle in degrees
 			sampleQuality[index]=quality; //Save quality of reading
-			dist[index]=(d/40.); //Save result in cm
+			dist[index]=(d/4); //Save result in mm
 			return startBit;
 		}
 

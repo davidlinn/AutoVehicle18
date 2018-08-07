@@ -17,7 +17,7 @@ namespace SpinningLidar {
 
 	//results of most recent scan, where the coordinate system is not as defined by Nav, but
 	//is as defined by SLAMTEC, the manufacturers of RPLIDAR. 0 is straight ahead, 90 is to the right.
-	extern volatile double dist[360];
+	extern volatile int dist[360];
 	extern volatile int sampleQuality[360];
 
 	//-----------------------------------------------------

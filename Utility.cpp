@@ -51,6 +51,10 @@ namespace Utility {
 		return 4.6249*((double)odo)/12.;
 	}
 
+	int odoToMM(uint32_t odo) {
+		return 117*odo;
+	}
+
 	/*
 	 * Scans the I2C bus for connected devices. The variable 'slaveAddress' is used
 	 * to revert this device's address to after the scan is complete. The function
@@ -112,5 +116,15 @@ namespace Utility {
 
 	float cmToFt(float cm) {
 		return .0328084*cm;
+	}
+
+	int lidarAngleToPolar(int lidarAngle) {
+		return degreeWrap(-lidarAngle+90);
+	}
+
+	float Zto360Wrap(float deg) {
+		while (deg < 0) deg += 360;
+		while (deg >= 360) deg -= 360;
+		return deg;
 	}
 }

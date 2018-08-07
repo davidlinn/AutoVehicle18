@@ -52,6 +52,7 @@ Odometer odo; //Global odometer object, reinstantiated in init()
 MPU9250 imu; //Global imu object, reinstantiated in init()
 Nav nav; //Constructor does nothing
 Path mainPath;
+Map map;
 NV_SettingsStruct NV_Settings;
 
 //Global Time
@@ -131,18 +132,29 @@ void LCDUpdate(void*) {
 		char buf[32];
 		//Nav
 		if (!nav.isFinished())
-			sprintf(buf,"x:%3.1f,y:%3.1f,h:%3.1f,h_des:%3.1f",nav.getX(),nav.getY(),getHeading(),nav.getHeadDes());
-		else sprintf(buf,":) x:%3.1f,y:%3.1f,h:%3.1f",nav.getX(),nav.getY(),getHeading());
+			sprintf(buf,"x:%3.1f,y:%3.1f,h:%3.1f,h_des:%3.1f",nav.getX()/1000.,nav.getY()/1000.,getHeading(),nav.getHeadDes());
+		else sprintf(buf,":) x:%3.1f,y:%3.1f,h:%3.1f",nav.getX()/1000.,nav.getY()/1000.,getHeading());
 		lcd.print(buf,32);
 		StartAD(); //Updates analog to digital converter so other functions can read switches
-		printf("\nSpLidar[0]:%f,Heading:%f,Right Lidar Val:%f,GlobalTimerTime:%f,%i\n",SpinningLidar::dist[0],getHeading(),getRightLidar(),getGlobalTime(),getGlobalTimerOverflow());
+		printf("\nSpLidar[0]:%i,Heading:%f,Right Lidar Val:%i,GlobalTimerTime:%f\n",SpinningLidar::dist[0],getHeading(),getRightLidar(),getGlobalTime());
+		printf("Log is %ipct full",GetLogPercent());
+		//Segment-based Mapping
+		/*if (getGlobalTime()>10) {
+			map.featureUpdate();
+			for (int i = 0; i < map.numLidarSegs; ++i)
+				printf("LidarSeg %i: startDeg=%i,endDeg=%i\n",i,map.lidarseglist[i].startingDegree,map.lidarseglist[i].endingDegree);
+			for (int i = 0; i < map.numSegments; ++i)
+				printf("Segment %i: m=%f,b=%f,x1=%f,x2=%f\n",i,map.segmentList[i].m,map.segmentList[i].b,map.segmentList[i].x1,map.segmentList[i].x2);
+			for (int i = 0; i < map.numCircles; ++i)
+				printf("Circle %i: x=%f,y=%f\n",i,map.circleList[i].x,map.circleList[i].y);
+		}*/
 		OSTimeDly(TICKS_PER_SECOND/2); //delay .5s
 	}
 }
 
 void Drive(void*) {
 	while (1) {
-		Profiler::tic(3);
+		//Profiler::tic(3);
 		if (Utility::mode()==1) { //Fully manual
 			SetServoPos(0,HiCon(rc_ch[1])); //Steer
 			SetServoRaw(1,rc_ch[2]); //Throttle
@@ -169,7 +181,7 @@ void Drive(void*) {
 		mainPath.addToPath(c); break;
 		default: break;
 		}*/
-		Profiler::toc(3);
+		//Profiler::toc(3);
 		OSTimeDly(TICKS_PER_SECOND/10);
 	}
 }
@@ -210,10 +222,10 @@ void UserMain(void * pd) {
     SpinningLidar::SpinningLidarInit(); //start top LIDAR serial read and processing task
 
     //Profiling
-    //OSTimeDly(TICKS_PER_SECOND*3);
-    //Profiler::start();
-	//OSTimeDly(15*TICKS_PER_SECOND);
-	//Profiler::stop();
+    /*OSTimeDly(TICKS_PER_SECOND);
+    Profiler::start(getGlobalTime);
+	OSTimeDly(15*TICKS_PER_SECOND);
+	Profiler::stop();*/
 
     while (1) {
     	OSTimeDly(TICKS_PER_SECOND);

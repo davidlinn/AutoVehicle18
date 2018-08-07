@@ -19,26 +19,27 @@ public:
 	Nav();
 	virtual ~Nav();
 //Getter Methods
-	float getX();
-	float getY();
+	int getX(); //in mm
+	int getY();
 	float getV();
 	float getHeadDes();
 	bool isFinished();
-	float getRightWallEst();
+	int getRightWallEst(); //in mm
 	float getHeadError();
 //Main Navigation Calculations
 	void navUpdate();
 	float getSteer();
 	float getThrottle();
 //Steer-related
-	float headingSteer();
-	float followRightWallSteer();
+	float headingSteer(); //returns steer val
+	float followRightWallSteer(); //returns steer val
 	float wallUpdate(); //updates wall estimates and returns difference between ests in ft
-	float followPathSteer();
+	float followPathSteer(); //returns steer val
+	float aStarSteer(); //returns steer val
 //Throttle-related
-	float moveUntilFinished(float throttle, float brake);
-	void brakeAndZero(float brake);
-	int waypointFinishCheck(float brake);
+	float moveUntilFinished(float throttle, float brake); //returns steer val
+	void brakeAndZero(float brake); //applies brake for .5s and then zeros throttle, only call if car is moving forward!
+	int waypointFinishCheck(float brake); //returns 1 if finished with waypoint navigation, 0 otherwise
 //Algorithms
 	Path shortestPath(int x, int y); //returns the shortest path to a waypoint using A*
 		//returns the heading that follows path of least potential
@@ -55,19 +56,18 @@ public:
 		followPath, //repeats path by minimizing deviance from recorded path while recognizing obstacles
 	};
 	NavMethod navMethod;
-	Map map;
 
 private:
 //Position
-	float x; //estimated X,Y from odometer+IMU readings in FEET
-	float y;
+	int x; //estimated X,Y from odometer+IMU readings in MILLIMETERS
+	int y;
 	uint32_t lastOdo;
-	float lastx;
-	float lasty;
+	int lastx;
+	int lasty;
 //Velocity
 	float v;
 	float lastv;
-	float distTraveled;
+	int distTraveled;
 //Time
 	double currenttime;
 	double lastnavupdate;
@@ -76,17 +76,17 @@ private:
 	float lastHeading;
 	float headError; //for wall following
 //Waypoints, Desired Quantities
-	float x_des = 20;
-	float y_des = 0;
+	int x_des = 6000; //6 meters
+	int y_des = 0;
 	float heading_des;
 	Path path;
 //State
 	bool finished = false;
 	int forward = 1; //1 is forward, -1 is backward
 	bool obstacleInPath = false;
-	float rightWallEst; //in cm
-	float prevRightWallEst;
-	float diff;
+	int rightWallEst; //in mm
+	int prevRightWallEst;
+	int diff;
 };
 
 #endif /* NAV_H_ */

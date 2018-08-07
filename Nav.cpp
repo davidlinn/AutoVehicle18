@@ -27,24 +27,27 @@
 #define K_P_STEER .01
 #define K_P_WALLFOLLOW (1./40.)
 #define BRAKE_PWR -.5 //more neg equals more pwr
+#define WAYPOINT_SUCCESS_RADIUS_SQ 250000 //50 cm
 
 extern Odometer odo;
+extern Map map;
 extern double getGlobalTime();
 
 Nav::Nav() {}
 Nav::~Nav() {}
-float Nav::getX() {return x;}
-float Nav::getY() {return y;}
+int Nav::getX() {return x;}
+int Nav::getY() {return y;}
 float Nav::getHeadDes() {return heading_des;}
 float Nav::getV() {return v;}
 bool Nav::isFinished() {return finished;}
-float Nav::getRightWallEst() {return rightWallEst;}
+int Nav::getRightWallEst() {return rightWallEst;}
 float Nav::getHeadError() {return headError;}
 
 //MAIN NAVIGATION METHODS
 
 void Nav::navUpdate() {
 	//Profiler::tic(2);
+	//The following lines assume that the ADC is updated every so often by calling StartAD(): we do it in LCDUpdate()
 	if (Utility::switchVal(GetADResult(1))==-1) { //if first switch is in the left position
 		x = 0; y = 0; //reset coordinates
 		rightWallEst = getRightLidar();
@@ -52,6 +55,8 @@ void Nav::navUpdate() {
 		finished = false; //not finished
 		return;
 	}
+	else if (Utility::switchVal(GetADResult(1))==1) //if first switch is in the right position
+		zeroHeading(); //zero out the heading (globally)
 	//Record time since last update
 	currenttime = getGlobalTime();
 	deltat = currenttime-lastnavupdate;
@@ -61,18 +66,18 @@ void Nav::navUpdate() {
 	lasty = y;
 	//Update coordinates using odometer difference and heading
 	double headingAverage = (getHeading()+lastHeading)/2;
-	double feetTraveled = Utility::odoToFeet(odo.getCount()-lastOdo);
+	int mmTraveled = Utility::odoToMM(odo.getCount()-lastOdo);
 	if (getServoPos(1)>-.005) { //moving forward
-		x += feetTraveled*fastcos(headingAverage*M_PI/180.);
-		y += feetTraveled*fastsin(headingAverage*M_PI/180.);
+		x += mmTraveled*fastcos(headingAverage*M_PI/180.);
+		y += mmTraveled*fastsin(headingAverage*M_PI/180.);
 	}
 	else { //moving backward
-		x -= feetTraveled*fastcos(headingAverage*M_PI/180.);
-		y -= feetTraveled*fastsin(headingAverage*M_PI/180.);
+		x -= mmTraveled*fastcos(headingAverage*M_PI/180.);
+		y -= mmTraveled*fastsin(headingAverage*M_PI/180.);
 	}
 	//Calculate velocity
 	lastv = v;
-	v = feetTraveled/deltat; //feet per second
+	v = mmTraveled/(1000*deltat); //m/s
 	//Save current heading and odometer
 	lastHeading = getHeading();
 	lastOdo = odo.getCount();
@@ -82,9 +87,9 @@ void Nav::navUpdate() {
 
 	//FOR WALL FOLLOWING
 	//Update walls and error in heading if we moved
-	if (feetTraveled > 0) {
-		diff = wallUpdate(); //difference in estimates in feet
-		headError = (180./M_PI)*asin(diff/feetTraveled); //in degrees
+	if (mmTraveled > 0) {
+		diff = wallUpdate(); //difference in estimates in mm
+		headError = (180./M_PI)*asin(diff/mmTraveled); //in degrees
 	}
 	//Profiler::toc(2);
 }
@@ -123,7 +128,7 @@ float Nav::headingSteer() {
 
 float Nav::followRightWallSteer() {
 	forward = 1;
-	if (rightWallEst>1 && fabs(diff) < 1 && !finished) //if estimate is not wildly different from previous
+	if (rightWallEst>300 && fabs(diff) < 300 && !finished) //if estimate is not wildly different from previous
 		return K_P_WALLFOLLOW*headError;
 	else {
 		finished = 1;
@@ -131,9 +136,9 @@ float Nav::followRightWallSteer() {
 	}
 }
 
-float Nav::wallUpdate() { //updates wall estimates and returns difference between current and previous estimate in feet
-	float d1 = getRightLidar();
-	float d2 = SpinningLidar::dist[90];
+float Nav::wallUpdate() { //updates wall estimates and returns difference between current and previous estimate in mm
+	int d1 = getRightLidar();
+	int d2 = SpinningLidar::dist[90];
 	int d2Quality = SpinningLidar::sampleQuality[90];
 	prevRightWallEst = rightWallEst;
 	if (d1 > 0) { //if good reading from solid state lidar
@@ -141,7 +146,7 @@ float Nav::wallUpdate() { //updates wall estimates and returns difference betwee
 		else rightWallEst = d1;
 	}
 	else rightWallEst = 0;
-	return Utility::cmToFt(prevRightWallEst-rightWallEst);
+	return prevRightWallEst-rightWallEst;
 }
 
 float Nav::followPathSteer() {
@@ -149,15 +154,15 @@ float Nav::followPathSteer() {
 }
 
 float Nav::artificialPotential() {
-	float SOURCEMAG = 20;
-	float x0,y0;
-	float mag;
+	int SOURCEMAG = 20;
+	int x0,y0;
+	int mag;
 	int dir;
 	for (int i = 0; i < 360; i+=2) {
 		if (SpinningLidar::dist[i] > 1) {
 			dir = Utility::degreeWrap(-i-90+lastHeading); //direction of "force"
 			mag = SpinningLidar::dist[i]; // 1/r^2
-			mag = SpinningLidar::sampleQuality[i]/pow(mag,2);
+			mag = SpinningLidar::sampleQuality[i]/(mag*mag);
 			x0 += mag*fastcos(dir);
 			y0 += mag*fastsin(dir);
 		}
@@ -180,8 +185,8 @@ float Nav::moveUntilFinished(float throttle, float brake) {
 }
 
 int Nav::waypointFinishCheck(float brake) {
-	float errorsq = (x-x_des)*(x-x_des) + (y-y_des)*(y-y_des); //won't be negative
-	if (errorsq < 1) {
+	int errorsq = (x-x_des)*(x-x_des) + (y-y_des)*(y-y_des); //won't be negative
+	if (errorsq < WAYPOINT_SUCCESS_RADIUS_SQ) {
 		finished = true;
 		if (getServoPos(1)>0 && (forward==1)) {
 			SetServoPos(1,brake); //brake (only works if moving forward)

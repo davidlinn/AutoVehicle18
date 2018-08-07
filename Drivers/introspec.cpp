@@ -36,7 +36,7 @@ volatile bool bLog;
 
 
 
-#define LOG_SIZE (1024*1024*16)
+#define LOG_SIZE (1024*1024*32)
 
 
 

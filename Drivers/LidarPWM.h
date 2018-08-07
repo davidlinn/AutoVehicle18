@@ -16,8 +16,8 @@
 //calls GlobalTimerInit for both timers
 void LidarPWMInit();
 void LidarPWMInitOld();
-double getLeftLidar(); //returns distance in cm
-double getRightLidar(); //returns distance in cm
+int getLeftLidar(); //returns distance in cm
+int getRightLidar(); //returns distance in cm
 int getGlobalTimerOverflow();
 void GlobalTimerInit(int timerNum);
 

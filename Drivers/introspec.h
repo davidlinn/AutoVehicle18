@@ -99,7 +99,6 @@ typedef INTROFEL<float>     float_element;
 typedef INTROFEL<double>    double_element;
 
 
-
 void LogMessage(const char * cp, bool force=false);
 void LogEvent(bool force=false);
 void InitLogFtp(int prio);
