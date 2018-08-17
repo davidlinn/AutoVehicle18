@@ -29,7 +29,7 @@
 #include "Drivers/SpinningLidar.h"
 #include "Drivers/pwm.h"
 #include <SimpleAD.h>
-#include <Boot_Settings.h>
+#include "Boot_Settings.h"
 #include <math.h>
 #include "Profiler.h"
 #include <constants.h>
@@ -93,16 +93,11 @@ void init() {
 	Pins[23].function(PIN_23_T2IN); //LIDAR pulse left / Timer 2 in
 	Pins[25].function(PIN_25_T3IN); //LIDAR pulse right / Timer 3 in
 	LidarPWMInit(); //initializes both side LIDARS and global timers
-	OSTimeDly(TICKS_PER_SECOND);
-	//for (int i = 0; i <10;++i) {
-	//	printf("\nRight Lidar Val: %f\n",getRightLidar());
-	//	OSTimeDly(TICKS_PER_SECOND);
-	//}
+	OSTimeDly(TICKS_PER_SECOND/10);
 
 	//RC
 	Pins[14].function(PIN_14_UART6_RXD);	//RC RX
 	InitDSM2Rx(RC_PORT); //Initialize RC on UART Port 6
-	iprintf("Initialized RC\n");
 
 	//Top LiDAR
 	Pins[13].function(PIN_13_UART2_RXD);	//LIDAR RX
@@ -127,6 +122,7 @@ void init() {
 }
 
 void LCDUpdate(void*) {
+	//bool initGrid = false;
 	while (1) {
 		lcd.clear();
 		char buf[32];
@@ -136,11 +132,18 @@ void LCDUpdate(void*) {
 		else sprintf(buf,":) x:%3.1f,y:%3.1f,h:%3.1f",nav.getX()/1000.,nav.getY()/1000.,getHeading());
 		lcd.print(buf,32);
 		StartAD(); //Updates analog to digital converter so other functions can read switches
-		printf("\nSpLidar[0]:%i,Heading:%f,Right Lidar Val:%i,GlobalTimerTime:%f\n",SpinningLidar::dist[0],getHeading(),getRightLidar(),getGlobalTime());
-		printf("Log is %ipct full",GetLogPercent());
-		//Segment-based Mapping
-		/*if (getGlobalTime()>10) {
-			map.featureUpdate();
+		//printf("\nSpLidar[0]:%i,Heading:%f,Right Lidar Val:%i,GlobalTimerTime:%f\n",SpinningLidar::dist[0],getHeading(),getRightLidar(),getGlobalTime());
+		//printf("\nLeftLidar:%i\n",getLeftLidar());
+		//printf("Log is %ipct full",GetLogPercent());
+		//Mapping
+		//if (getGlobalTime()>20)
+		//	map.featureUpdate();
+		/*{
+			if (!initGrid) {
+				map.initLocalGrid();
+				initGrid = true;
+			}
+			else map.updateOGrid();
 			for (int i = 0; i < map.numLidarSegs; ++i)
 				printf("LidarSeg %i: startDeg=%i,endDeg=%i\n",i,map.lidarseglist[i].startingDegree,map.lidarseglist[i].endingDegree);
 			for (int i = 0; i < map.numSegments; ++i)
@@ -148,13 +151,12 @@ void LCDUpdate(void*) {
 			for (int i = 0; i < map.numCircles; ++i)
 				printf("Circle %i: x=%f,y=%f\n",i,map.circleList[i].x,map.circleList[i].y);
 		}*/
-		OSTimeDly(TICKS_PER_SECOND/2); //delay .5s
+		OSTimeDly(TICKS_PER_SECOND/2); //run at 3 Hz
 	}
 }
 
 void Drive(void*) {
 	while (1) {
-		//Profiler::tic(3);
 		if (Utility::mode()==1) { //Fully manual
 			SetServoPos(0,HiCon(rc_ch[1])); //Steer
 			SetServoRaw(1,rc_ch[2]); //Throttle
@@ -172,16 +174,6 @@ void Drive(void*) {
 		else if (switch3 == 0) nav.navMethod = Nav::NavMethod::followRightWall;
 		else nav.navMethod = Nav::NavMethod::followPath;
 		nav.navUpdate();
-
-		/*//Build path
-		switch (rc_ch[6]) {
-		case 1: mainPath = Path(); break; //reset path
-		case 2: Path::Coordinate c; //add coordinate to path
-		c.x=nav.getX(); c.y=nav.getY();
-		mainPath.addToPath(c); break;
-		default: break;
-		}*/
-		//Profiler::toc(3);
 		OSTimeDly(TICKS_PER_SECOND/10);
 	}
 }
@@ -222,10 +214,16 @@ void UserMain(void * pd) {
     SpinningLidar::SpinningLidarInit(); //start top LIDAR serial read and processing task
 
     //Profiling
-    /*OSTimeDly(TICKS_PER_SECOND);
+    /*OSTimeDly(TICKS_PER_SECOND*10);
     Profiler::start(getGlobalTime);
 	OSTimeDly(15*TICKS_PER_SECOND);
-	Profiler::stop();*/
+	Profiler::stop();
+	printf("\nLidarSegs\n");
+	for (int i = 0; i < map.numLidarSegs; ++i)
+		printf("%i,%i\n",map.lidarseglist[i].startingDegree,map.lidarseglist[i].endingDegree);
+	printf("\nSegments\n");
+	for (int i = 0; i < map.numSegments; ++i)
+		printf("m:%f,b:%f",map.segmentList[i].m,map.segmentList[i].b);*/
 
     while (1) {
     	OSTimeDly(TICKS_PER_SECOND);

@@ -24,7 +24,6 @@
 #include "Profiler.h"
 #include "FastMath.h"
 
-#define K_P_STEER .01
 #define K_P_WALLFOLLOW (1./40.)
 #define BRAKE_PWR -.5 //more neg equals more pwr
 #define WAYPOINT_SUCCESS_RADIUS_SQ 250000 //50 cm
@@ -46,7 +45,6 @@ float Nav::getHeadError() {return headError;}
 //MAIN NAVIGATION METHODS
 
 void Nav::navUpdate() {
-	//Profiler::tic(2);
 	//The following lines assume that the ADC is updated every so often by calling StartAD(): we do it in LCDUpdate()
 	if (Utility::switchVal(GetADResult(1))==-1) { //if first switch is in the left position
 		x = 0; y = 0; //reset coordinates
@@ -68,12 +66,12 @@ void Nav::navUpdate() {
 	double headingAverage = (getHeading()+lastHeading)/2;
 	int mmTraveled = Utility::odoToMM(odo.getCount()-lastOdo);
 	if (getServoPos(1)>-.005) { //moving forward
-		x += mmTraveled*fastcos(headingAverage*M_PI/180.);
-		y += mmTraveled*fastsin(headingAverage*M_PI/180.);
+		x += mmTraveled*fastcos(headingAverage);
+		y += mmTraveled*fastsin(headingAverage);
 	}
 	else { //moving backward
-		x -= mmTraveled*fastcos(headingAverage*M_PI/180.);
-		y -= mmTraveled*fastsin(headingAverage*M_PI/180.);
+		x -= mmTraveled*fastcos(headingAverage);
+		y -= mmTraveled*fastsin(headingAverage);
 	}
 	//Calculate velocity
 	lastv = v;
@@ -81,9 +79,10 @@ void Nav::navUpdate() {
 	//Save current heading and odometer
 	lastHeading = getHeading();
 	lastOdo = odo.getCount();
-	//Calculate desired heading, simply and then adding artificial potential field
+	//Calculate desired heading simply before adding heading adjustment algorithms
 	heading_des = (180./M_PI)*atan2(y_des-y,x_des-x);
-	//heading_des = artificialPotential();
+	//Greedy Heading Algorithm
+	cocHDesAdjust();
 
 	//FOR WALL FOLLOWING
 	//Update walls and error in heading if we moved
@@ -91,7 +90,6 @@ void Nav::navUpdate() {
 		diff = wallUpdate(); //difference in estimates in mm
 		headError = (180./M_PI)*asin(diff/mmTraveled); //in degrees
 	}
-	//Profiler::toc(2);
 }
 
 float Nav::getSteer() { //1 left, -1 right. getSteer() must also provide a value for forward
@@ -115,14 +113,12 @@ float Nav::getThrottle() {
 //STEERING-RELATED METHODS
 
 float Nav::headingSteer() {
-	Profiler::tic(0);
 	float error = Utility::degreeWrap(heading_des-lastHeading);
 	if (error>90 || error<-90) {
 		forward = -1;
 		error = Utility::degreeWrap(error-180); //calculate error as if car was flipped
 	}
 	else forward = 1;
-	Profiler::toc(0);
 	return forward*K_P_STEER*error;
 }
 
@@ -172,14 +168,79 @@ float Nav::artificialPotential() {
 	return (180./M_PI)*atan2(y0,x0); //in degrees
 }
 
+void Nav::greedyHeadDesAdjust() {
+	if (objectInPath(heading_des,2,3000)) { //if there's something at that heading, adjust heading greedily
+		int closestPath = closestFreeSector(heading_des,2,3000);
+		if (closestPath == -1000) {
+			closestPath = closestFreeSector(heading_des,2,2000);
+			if (closestPath == -1000) {
+				closestPath = closestFreeSector(heading_des,3,700);
+				if (closestPath == -1000) {
+					closestPath = Utility::Zto360Wrap(heading_des+180); //give up and finding a path and try to reverse
+				}
+			}
+		}
+		heading_des = closestPath;
+		K_P_STEER = .03;
+	}
+	else K_P_STEER = .02;
+}
+
+void Nav::cocHDesAdjust() {
+	//Populate circle of concern
+	int head = heading_des; //convert heading to integer
+	circleOfConcern[0] = SpinningLidar::dist[Utility::Zto360Wrap(head)];
+	for (int i = 1; i < CIR_CONCERN_SIZE-1; i+=2) {
+		circleOfConcern[i] = SpinningLidar::dist[Utility::Zto360Wrap(head+i)]; //left
+		circleOfConcern[i+1] = SpinningLidar::dist[Utility::Zto360Wrap(head-i)]; //right
+	}
+	//Update concern level member variable
+	updateConcernLvl();
+	//Now that we know which level in our circle of concern we need to work in, let's set heading_des to the closest
+	//free arc. If there's no free arc found within 90 degrees, give up and keep going toward heading_des until concernLvl 0
+	switch (concernLvl) {
+		case 4: K_P_STEER = .02; return; //end heading adjustment if there's no concern
+		case 3: K_P_STEER = .025; heading_des = closestFreeSector(head, 2, 4000); break; //otherwise, adjust heading_des based on concernLvl
+		case 2: K_P_STEER = .03; heading_des = closestFreeSector(head, 4, 2290); break;
+		case 1: K_P_STEER = .035; heading_des = closestFreeSector(head, 6, 1520); break;
+		default: K_P_STEER = .04; heading_des = Utility::degreeWrap(head+180); break; //case 0: just reverse
+	}
+}
+
 //THROTTLE-RELATED METHODS
 
 float Nav::moveUntilFinished(float throttle, float brake) {
+	//When assigning power, note that backwards needs more power than forwards
 	if (!finished) {
-		if (getServoPos(1)>0 && (forward==-1)) //switch directions from forward to backward
-			brakeAndZero(brake);
+		if (getServoPos(1)>.01 && forward==-1) //switch directions from forward to backward
+			brakeAndZero(brake, .3, .3); //brake for .3s, zero for .3s to allow speed controller to accept a reverse signal
 		if (waypointFinishCheck(brake)) return 0;
-		else return forward*throttle-.035; //backwards needs more power than forwards
+		else {
+			if (throttleStackSize > 0) { //always return from the stack if there's anything on there
+				return forward*throttleStack[--throttleStackSize]-.035;
+			}
+			else if (concernLvl == 0) { //if an object is in our immediate circle of concern, two brakes, a zero, and a go OR one zero and a go
+				throttleStack[throttleStackSize++] = .145;
+				if (getServoPos(1)>.01) { //if currently moving forward
+					throttleStack[throttleStackSize++] = .035; //zero
+					throttleStack[throttleStackSize++] = brake;
+					return brake;
+				}
+				else return 0;
+			}
+			else if (concernLvl == 1) { //if an object is in the primary circle of concern, one zero and a go
+				throttleStack[throttleStackSize++] = .145;
+				return 0;
+			}
+			else if (concernLvl == 2) { //secondary circle of concern: one zero and a go
+				throttleStack[throttleStackSize++] = .145;
+				return 0;
+			}
+			else if (concernLvl == 3) { //tertiary circle of concern
+				return forward*.145-.035;
+			}
+			else return forward*.165-.035; //no concern
+		}
 	}
 	return 0;
 }
@@ -187,20 +248,102 @@ float Nav::moveUntilFinished(float throttle, float brake) {
 int Nav::waypointFinishCheck(float brake) {
 	int errorsq = (x-x_des)*(x-x_des) + (y-y_des)*(y-y_des); //won't be negative
 	if (errorsq < WAYPOINT_SUCCESS_RADIUS_SQ) {
-		finished = true;
-		if (getServoPos(1)>0 && (forward==1)) {
-			SetServoPos(1,brake); //brake (only works if moving forward)
-			OSTimeDly(TICKS_PER_SECOND/2);
+		if (numWaypts == 0) { //if no more waypoints on the stack
+			finished = true;
+			if (getServoPos(1)>.01 && (forward==1)) {
+				SetServoPos(1,brake); //brake for .33 secs (only works if moving forward)
+				OSTimeDly(TICKS_PER_SECOND/3);
+			}
+			SetServoPos(1,0); //Reset throttle to zero
+			return 1;
 		}
-		SetServoPos(1,0); //Reset throttle to zero
-		return 1;
+		else { //else pop a waypoint off the stack
+			--numWaypts;
+			x_des = x_des_stack[numWaypts];
+			y_des = y_des_stack[numWaypts];
+		}
 	}
-	else return 0;
+	return 0;
 }
 
-void Nav::brakeAndZero(float brake) { //Only call if moving forward
-	SetServoPos(1,brake); //brake
-	OSTimeDly(TICKS_PER_SECOND/2);
-	SetServoPos(1,0); //Electronic speed controller needs to record a zero
-	OSTimeDly(TICKS_PER_SECOND/2);
+void Nav::brakeAndZero(float brake, float brakeSecs, float zeroSecs) {
+	if (getServoPos(1)>.01) { //if speed controller is currently being sent a forward value
+		SetServoPos(1,brake); //brake for .33 secs
+		OSTimeDly(TICKS_PER_SECOND*brakeSecs);
+	}
+	SetServoPos(1,0); //Electronic speed controller should record a zero
+	OSTimeDly(TICKS_PER_SECOND*zeroSecs);
+}
+
+bool Nav::objectInPath(int heading, int degreeSpread, int distance) {
+	int head = getHeading();
+	for (int i = head-heading-degreeSpread; i < head-heading+degreeSpread; ++i) {
+		int dir = Utility::Zto360Wrap(i);
+		int mag = SpinningLidar::dist[dir];
+		if (SpinningLidar::sampleQuality[dir]>1 && mag>1 && mag<distance)
+			return true;
+	}
+	return false;
+}
+
+int Nav::closestFreeSector(int startingDegree, int halfArc, int r) { //assumes startingDegree path is bad
+	int arc = 2*halfArc; //total arc in degrees
+	int sum, mag, dir;
+	int head = getHeading();
+	int leftIndex = head-startingDegree; //set left and right indices corresponding to a lidar value
+	int rightIndex = leftIndex;
+	while ((leftIndex < head-startingDegree+90) || (rightIndex > head-startingDegree-90)) {
+		//check left path
+		dir = Utility::Zto360Wrap(++leftIndex);
+		mag = SpinningLidar::dist[dir];
+		sum = 0;
+		while (mag > r || mag < 1) { //good if lidar sees no obstructions
+			if (++sum > arc) return Utility::degreeWrap(head-leftIndex-halfArc);
+			dir = Utility::Zto360Wrap(++leftIndex);
+			mag = SpinningLidar::dist[dir];
+		}
+		//check right path
+		dir = Utility::Zto360Wrap(--rightIndex);
+		mag = SpinningLidar::dist[dir];
+		sum = 0;
+		while (mag > r || mag < 1) { //good if lidar sees no obstructions
+			if (++sum > arc) return Utility::degreeWrap(head-rightIndex+halfArc);
+			dir = Utility::Zto360Wrap(--rightIndex);
+			mag = SpinningLidar::dist[dir];
+		}
+	}
+	return startingDegree; //if there's no free path within 90 degrees, give up and just return startingDegree
+}
+
+void Nav::updateConcernLvl() {
+	//Lvl 0
+	for (int i = 0; i < CIR_CONCERN_SIZE; ++i) { //23 degree arc
+		if (circleOfConcern[i] > 1 && circleOfConcern[i] < 800) { //80 cm
+			concernLvl = 0;
+			return;
+		}
+	}
+	//Lvl 1
+	for (int i = 0; i < 13; ++i) { //13 degree arc
+		if (circleOfConcern[i] > 1 && circleOfConcern[i] < 1520) { //152 cm
+			concernLvl = 1;
+			return;
+		}
+	}
+	//Lvl 2
+	for (int i = 0; i < 9; ++i) { //9 degree arc
+		if (circleOfConcern[i] > 1 && circleOfConcern[i] < 2290) { //229 cm
+			concernLvl = 2;
+			return;
+		}
+	}
+	//Lvl 3
+	for (int i = 0; i < 5; ++i) { //5 degree arc
+		if (circleOfConcern[i] > 1 && circleOfConcern[i] < 4000) { //400 cm
+			concernLvl = 3;
+			return;
+		}
+	}
+	concernLvl = 4;
+	return;
 }

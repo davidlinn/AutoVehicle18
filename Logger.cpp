@@ -22,6 +22,9 @@
 #include "Drivers/SpinningLidar.h"
 #include "Drivers/LidarPWM.h"
 #include "Map.h"
+#include "Profiler.h"
+
+#define LOG_SEGS 0 //set to 1 to log segs and circles
 
 extern Odometer odo;
 extern Nav nav;
@@ -77,6 +80,7 @@ void Logger::logLoop(void*) {
 	int lidarResolution = 10;
 	while (1) {
 		if (rc_ch[4]>1000) { //if Log is switched on
+			Profiler::tic(3);
 			//mainLog
 			mainLog.globalTime=getGlobalTime();
 			mainLog.heading=getHeading();
@@ -96,38 +100,52 @@ void Logger::logLoop(void*) {
 				spLidarLog.splidar=SpinningLidar::dist[i];
 				spLidarLog.Log();
 			}
-			//circleLog
-			circleLog.circlearraystart = 1;
-			if (map.numCircles>0) {
-				circleLog.circlex=map.circleList[0].x;
-				circleLog.circley=map.circleList[0].y;
-				circleLog.circleradius=map.circleList[0].radius;
-			}
-			circleLog.Log();
-			circleLog.circlearraystart = 0;
-			for (int i = 1; i < map.numCircles; ++i) {
-				circleLog.circlex=map.circleList[i].x;
-				circleLog.circley=map.circleList[i].y;
-				circleLog.circleradius=map.circleList[i].radius;
+			if (LOG_SEGS) {
+				//circleLog
+				circleLog.circlearraystart = 1;
+				if (map.numCircles>0) {
+					circleLog.circlex=map.circleList[0].x;
+					circleLog.circley=map.circleList[0].y;
+					circleLog.circleradius=map.circleList[0].radius;
+				}
+				else {
+					circleLog.circlex=0;
+					circleLog.circley=0;
+					circleLog.circleradius=0;
+				}
 				circleLog.Log();
-			}
-			//segLog
-			segLog.segarraystart = 1;
-			if (map.numSegments>0) {
-				segLog.segm=map.segmentList[0].m;
-				segLog.segb=map.segmentList[0].b;
-				segLog.segx1=map.segmentList[0].x1;
-				segLog.segx2=map.segmentList[0].x2;
-			}
-			segLog.Log();
-			segLog.segarraystart = 0;
-			for (int i = 1; i < map.numSegments; ++i) {
-				segLog.segm=map.segmentList[i].m;
-				segLog.segb=map.segmentList[i].b;
-				segLog.segx1=map.segmentList[i].x1;
-				segLog.segx2=map.segmentList[i].x2;
+				circleLog.circlearraystart = 0;
+				for (int i = 1; i < map.numCircles; ++i) {
+					circleLog.circlex=map.circleList[i].x;
+					circleLog.circley=map.circleList[i].y;
+					circleLog.circleradius=map.circleList[i].radius;
+					circleLog.Log();
+				}
+				//segLog
+				segLog.segarraystart = 1;
+				if (map.numSegments>0) {
+					segLog.segm=map.segmentList[0].m;
+					segLog.segb=map.segmentList[0].b;
+					segLog.segx1=map.segmentList[0].x1;
+					segLog.segx2=map.segmentList[0].x2;
+				}
+				else {
+					segLog.segm=0;
+					segLog.segb=0;
+					segLog.segx1=0;
+					segLog.segx2=0;
+				}
 				segLog.Log();
+				segLog.segarraystart = 0;
+				for (int i = 1; i < map.numSegments; ++i) {
+					segLog.segm=map.segmentList[i].m;
+					segLog.segb=map.segmentList[i].b;
+					segLog.segx1=map.segmentList[i].x1;
+					segLog.segx2=map.segmentList[i].x2;
+					segLog.Log();
+				}
 			}
+			Profiler::toc(3);
 		}
 		OSTimeDly(TICKS_PER_SECOND/3); //Log at 3 Hz
 	}

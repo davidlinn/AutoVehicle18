@@ -35,7 +35,6 @@
 									<listOptionValue builtIn="false" value="&quot;${NBROOT}/include&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${NBROOT}/NANO54415/include&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${NBROOT}/gcc-m68k/m68k-unknown-elf/include&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/AutoVeh18}&quot;"/>
 								</option>
 								<inputType id="nbeclipse.toolchain.nbde.rel.tc.gcc.input.131261604" name="GNU C Input" superClass="nbeclipse.toolchain.nbde.rel.tc.gcc.input"/>
 							</tool>
@@ -47,9 +46,6 @@
 									<listOptionValue builtIn="false" value="&quot;${NBROOT}/include&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${NBROOT}/NANO54415/include&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${NBROOT}/gcc-m68k/m68k-unknown-elf/include&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/AutoVeh18}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;C:\Nburn\gcc-m68k\m68k-unknown-elf\include\c++\5.2.0&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;C:\Nburn\gcc-m68k\lib\gcc\m68k-unknown-elf\5.2.0\include&quot;"/>
 								</option>
 								<option id="nbeclipse.toolchain.super.gpp.debugging.stackcheck.1348695144" name="Enable stack checking (-fstack-check)" superClass="nbeclipse.toolchain.super.gpp.debugging.stackcheck" value="true" valueType="boolean"/>
 								<inputType id="nbeclipse.toolchain.nbde.rel.tc.gpp.input.177905739" name="GNU C++ Input" superClass="nbeclipse.toolchain.nbde.rel.tc.gpp.input"/>
@@ -82,6 +78,36 @@
 							</tool>
 						</toolChain>
 					</folderInfo>
+					<folderInfo id="nbeclipse.toolchain.nbde.rel.1376788858.1694755522" name="/" resourcePath="Drivers">
+						<toolChain id="nbeclipse.toolchain.nbde.rel.tc.1769948443" name="NetBurner Device" superClass="nbeclipse.toolchain.nbde.rel.tc" unusedChildren="">
+							<tool id="nbeclipse.toolchain.nbde.rel.tc.html.144887898" name="NetBurner Comphtml" superClass="nbeclipse.toolchain.nbde.rel.tc.html.1612069548"/>
+							<tool id="nbeclipse.toolchain.nbde.rel.tc.lua.36410719" name="NetBurner Complua" superClass="nbeclipse.toolchain.nbde.rel.tc.lua.1223801607"/>
+							<tool id="nbeclipse.toolchain.nbde.rel.tc.prom.658260558" name="FPGA Promgen" superClass="nbeclipse.toolchain.nbde.rel.tc.prom.961499732"/>
+							<tool id="nbeclipse.toolchain.nbde.rel.tc.cfile.1903045773" name="NetBurner Compfile" superClass="nbeclipse.toolchain.nbde.rel.tc.cfile.639137699"/>
+							<tool id="nbeclipse.toolchain.nbde.rel.tc.gcc.2033903442" name="GNU C Compiler" superClass="nbeclipse.toolchain.nbde.rel.tc.gcc.121209086">
+								<option id="nbeclipse.toolchain.super.gcc.directories.includepaths.449227726" superClass="nbeclipse.toolchain.super.gcc.directories.includepaths" valueType="includePath">
+									<listOptionValue builtIn="false" value="&quot;${NBROOT}/include&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${NBROOT}/NANO54415/include&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${NBROOT}/gcc-m68k/m68k-unknown-elf/include&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/AutoVeh18}&quot;"/>
+								</option>
+								<inputType id="nbeclipse.toolchain.nbde.rel.tc.gcc.input.1831288949" name="GNU C Input" superClass="nbeclipse.toolchain.nbde.rel.tc.gcc.input"/>
+							</tool>
+							<tool id="nbeclipse.toolchain.nbde.rel.tc.gpp.371867952" name="GNU C++ Compiler" superClass="nbeclipse.toolchain.nbde.rel.tc.gpp.1967040768">
+								<inputType id="nbeclipse.toolchain.nbde.rel.tc.gpp.input.1283775841" name="GNU C++ Input" superClass="nbeclipse.toolchain.nbde.rel.tc.gpp.input"/>
+							</tool>
+							<tool id="nbeclipse.toolchain.nbde.rel.tc.as.1806183497" name="GNU Assembler" superClass="nbeclipse.toolchain.nbde.rel.tc.as.2105663701">
+								<inputType id="nbeclipse.toolchain.nbde.rel.tc.as.input.1502248205" name="GNU Assembler Input" superClass="nbeclipse.toolchain.nbde.rel.tc.as.input"/>
+							</tool>
+							<tool id="nbeclipse.toolchain.nbde.rel.tc.link.1650473531" name="GNU C/C++ Linker" superClass="nbeclipse.toolchain.nbde.rel.tc.link.568465862"/>
+							<tool id="nbeclipse.toolchain.nbde.rel.tc.objcopy.1914160648" name="GNU ELF Objcopy" superClass="nbeclipse.toolchain.nbde.rel.tc.objcopy.2137071701"/>
+							<tool id="nbeclipse.toolchain.nbde.rel.tc.compcode.1532622233" name="NetBurner Compcode" superClass="nbeclipse.toolchain.nbde.rel.tc.compcode.1562409763"/>
+						</toolChain>
+					</folderInfo>
+					<sourceEntries>
+						<entry excluding="Drivers" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
+						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="Drivers"/>
+					</sourceEntries>
 				</configuration>
 			</storageModule>
 			<storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>
@@ -118,7 +144,6 @@
 									<listOptionValue builtIn="false" value="&quot;${NBROOT}/include&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${NBROOT}/NANO54415/include&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${NBROOT}/gcc-m68k/m68k-unknown-elf/include&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/AutoVeh18}&quot;"/>
 								</option>
 								<option id="nbeclipse.toolchain.nbde.debug.tc.gcc.preprocessor.defined.1632195688" name="Defined Symbols (-D)" superClass="nbeclipse.toolchain.nbde.debug.tc.gcc.preprocessor.defined" valueType="stringList">
 									<listOptionValue builtIn="false" value="_DEBUG"/>
@@ -133,7 +158,6 @@
 									<listOptionValue builtIn="false" value="&quot;${NBROOT}/include&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${NBROOT}/NANO54415/include&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${NBROOT}/gcc-m68k/m68k-unknown-elf/include&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/AutoVeh18}&quot;"/>
 								</option>
 								<option id="nbeclipse.toolchain.nbde.debug.tc.gpp.preprocessor.defined.174954339" name="Defined Symbols (-D)" superClass="nbeclipse.toolchain.nbde.debug.tc.gpp.preprocessor.defined" valueType="stringList">
 									<listOptionValue builtIn="false" value="_DEBUG"/>
@@ -169,6 +193,30 @@
 							</tool>
 						</toolChain>
 					</folderInfo>
+					<folderInfo id="nbeclipse.toolchain.nbde.debug.912502264.880665875" name="/" resourcePath="Drivers">
+						<toolChain id="nbeclipse.toolchain.nbde.debug.tc.2116653795" name="NetBurner Device" superClass="nbeclipse.toolchain.nbde.debug.tc" unusedChildren="">
+							<tool id="nbeclipse.toolchain.nbde.debug.tc.html.826600053" name="NetBurner Comphtml" superClass="nbeclipse.toolchain.nbde.debug.tc.html.726545248"/>
+							<tool id="nbeclipse.toolchain.nbde.debug.tc.lua.113384870" name="NetBurner Complua" superClass="nbeclipse.toolchain.nbde.debug.tc.lua.784263551"/>
+							<tool id="nbeclipse.toolchain.nbde.debug.tc.gcc.1398153667" name="GNU C Compiler" superClass="nbeclipse.toolchain.nbde.debug.tc.gcc.496910796">
+								<option id="nbeclipse.toolchain.super.gcc.directories.includepaths.1698754725" superClass="nbeclipse.toolchain.super.gcc.directories.includepaths" valueType="includePath">
+									<listOptionValue builtIn="false" value="&quot;${NBROOT}/include&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${NBROOT}/NANO54415/include&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${NBROOT}/gcc-m68k/m68k-unknown-elf/include&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/AutoVeh18}&quot;"/>
+								</option>
+								<inputType id="nbeclipse.toolchain.nbde.debug.tc.gcc.input.465167415" name="GNU C Input" superClass="nbeclipse.toolchain.nbde.debug.tc.gcc.input"/>
+							</tool>
+							<tool id="nbeclipse.toolchain.nbde.debug.tc.gpp.2079035595" name="GNU C++ Compiler" superClass="nbeclipse.toolchain.nbde.debug.tc.gpp.1861676434">
+								<inputType id="nbeclipse.toolchain.nbde.debug.tc.gpp.input.710774982" name="GNU C++ Input" superClass="nbeclipse.toolchain.nbde.debug.tc.gpp.input"/>
+							</tool>
+							<tool id="nbeclipse.toolchain.nbde.debug.tc.as.640994656" name="GNU Assembler" superClass="nbeclipse.toolchain.nbde.debug.tc.as.999031632">
+								<inputType id="nbeclipse.toolchain.nbde.debug.tc.as.input.1503302876" name="GNU Assembler Input" superClass="nbeclipse.toolchain.nbde.debug.tc.as.input"/>
+							</tool>
+							<tool id="nbeclipse.toolchain.nbde.debug.tc.link.270909674" name="GNU C/C++ Linker" superClass="nbeclipse.toolchain.nbde.debug.tc.link.1949051360"/>
+							<tool id="nbeclipse.toolchain.nbde.debug.tc.objcopy.326772139" name="GNU ELF Objcopy" superClass="nbeclipse.toolchain.nbde.debug.tc.objcopy.1635618264"/>
+							<tool id="nbeclipse.toolchain.nbde.debug.tc.compcode.762416096" name="NetBurner Compcode" superClass="nbeclipse.toolchain.nbde.debug.tc.compcode.305016162"/>
+						</toolChain>
+					</folderInfo>
 				</configuration>
 			</storageModule>
 			<storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>
@@ -183,4 +231,6 @@
 	<storageModule moduleId="refreshScope" versionNumber="1">
 		<resource resourceType="PROJECT" workspacePath="/AutoVeh18"/>
 	</storageModule>
+	<storageModule moduleId="org.eclipse.cdt.make.core.buildtargets"/>
+	<storageModule moduleId="org.eclipse.cdt.internal.ui.text.commentOwnerProjectMappings"/>
 </cproject>

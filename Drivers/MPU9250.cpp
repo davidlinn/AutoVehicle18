@@ -8,13 +8,13 @@
 #include <constants.h>
 #include <stdio.h>
 #include <basictypes.h>
-#include "Utility.h"
 #include <pins.h>
 #include <ucos.h>
 #include <pin_irq.h>
-#include "Math.h"
+#include <math.h>
 #include <HiResTimer.h>
-#include "VehDefs.h"
+#include "../Utility.h"
+#include "../VehDefs.h"
 
 MPU9250::MPU9250(uint8_t intPin)
 {

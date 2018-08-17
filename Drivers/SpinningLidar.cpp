@@ -12,10 +12,10 @@
 #include <stdio.h>
 #include <pins.h>
 #include <pin_irq.h>
-#include "VehDefs.h"
+#include "../VehDefs.h"
 #include <iosys.h>
 #include <math.h>
-#include "Profiler.h"
+#include "../Profiler.h"
 #include <pitr_sem.h>
 
 namespace SpinningLidar {
@@ -144,11 +144,9 @@ namespace SpinningLidar {
 		while (1) {
 			SpLidarSem.Pend();
 			rv = read(fds,lidar_buffer,128);
-			Profiler::tic(6);
 			for (int j = 0; j < rv; ++j) {
 				processChar(fds,lidar_buffer[j]);
 			}
-			Profiler::toc(6);
 		}
 	}
 }//end namespace

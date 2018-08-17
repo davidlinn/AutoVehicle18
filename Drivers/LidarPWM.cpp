@@ -15,8 +15,8 @@
 #include <pin_irq.h>
 #include <intcdefs.h>
 #include <HiResTimer.h>
-#include "VehDefs.h"
-#include "Profiler.h"
+#include "../VehDefs.h"
+#include "../Profiler.h"
 #include <constants.h>
 
 volatile static uint8_t bLIDAR_MODE_LEFT;
@@ -30,7 +30,7 @@ static int globalTimerOverflow = 0;
 int getGlobalTimerOverflow() {return globalTimerOverflow;}
 
 //Left Interrupt
-/*INTERRUPT(LIDAR_ISR_LEFT,0x2700)
+INTERRUPT(LIDAR_ISR_LEFT,0x2700)
 {
 	sim2.timer[2].ter=3;
 	if(bLIDAR_MODE_LEFT==1) //Just hit rising edge
@@ -50,7 +50,7 @@ int getGlobalTimerOverflow() {return globalTimerOverflow;}
 			LIDAR_VALUE_LEFT=(v-LIDAR_LAST_START_LEFT);
 #endif
 		}
-}*/
+}
 
 //Right Interrupt
 INTERRUPT(LIDAR_ISR_RIGHT,0x2700) {
@@ -79,9 +79,9 @@ INTERRUPT(LIDAR_ISR_RIGHT,0x2700) {
 
 void LidarPWMInit() {
 	//left
-	//GlobalTimerInit(2);
-	//SETUP_DMATIMER2_ISR(&LIDAR_ISR_LEFT,2);
-	//bLIDAR_MODE_LEFT=1;
+	SETUP_DMATIMER2_ISR(&LIDAR_ISR_LEFT,2);
+	GlobalTimerInit(2);
+	bLIDAR_MODE_LEFT=1;
 	//right
 	SETUP_DMATIMER3_ISR(&LIDAR_ISR_RIGHT,2);
 	GlobalTimerInit(3);
@@ -105,7 +105,7 @@ int getLeftLidar() {
 	//from the center of the car. Likewise, subtract 1 for each mm the lens is mounted
 	//closer to the center of the car.
 	//Uncertainty is about 25 mm
-	return (int)(LIDAR_VALUE_LEFT*.0079668)-40;
+	return (int)(LIDAR_VALUE_LEFT*.0079668)-25;
 }
 
 int getRightLidar() {

@@ -17,7 +17,7 @@
 #include "Drivers/servodrive.h"
 #include "Drivers/lcd.h"
 #include "Utility.h"
-#include <Drivers/Odometer.h>
+#include "Drivers/Odometer.h"
 #include "tests.h"
 
 extern LCD lcd;

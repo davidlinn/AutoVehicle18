@@ -20,7 +20,6 @@ extern double getGlobalTime();
 
 Map::Map() {
 	// TODO Auto-generated constructor stub
-
 }
 
 Map::~Map() {
@@ -68,7 +67,7 @@ void Map::segmentLidar() {
 void Map::recursiveSplitAndFit(LidarSegmentation& seg) {
 	//LIDAR coordinate system (0 is directly in front of car, positive in CW dir)
 	if (seg.startingDegree==seg.endingDegree) return; //Base case for recursion
-	float THRESHOLD = 8;
+	float THRESHOLD = 130; //13 cm
 	//Consider the line formed by the endpoints
 	float mag1 = SpinningLidar::dist[seg.startingDegree];
 	float x1 = mag1*fastcos(seg.startingDegree);
@@ -122,11 +121,11 @@ void Map::fastLinearFit(LidarSegmentation& seg) {
 	}
 	//Otherwise, find the model parameters m and b that correspond with the line y=mx+b
 	float mag1 = SpinningLidar::dist[seg.startingDegree];
-	float degree = getHeading()+Utility::lidarAngleToPolar(seg.startingDegree);
-	float x1 = nav.getX()+mag1*fastcos(degree);
+	float degree = getHeading()-seg.startingDegree; //heading plus lidar offset
+	float x1 = nav.getX()+mag1*fastcos(degree);  //fasttrig does zero to 360 mapping
 	float y1 = nav.getY()+mag1*fastsin(degree);
 	float mag2 = SpinningLidar::dist[seg.endingDegree];
-	degree = getHeading()+Utility::lidarAngleToPolar(seg.endingDegree);
+	degree = getHeading()-seg.endingDegree;
 	float x2 = nav.getX()+mag2*fastcos(degree);
 	float y2 = nav.getY()+mag2*fastsin(degree);
 	//Define line segment: y-y1=m(x-x1)  y=m*x(-m*x1+y1)  y=mx+b
@@ -135,6 +134,7 @@ void Map::fastLinearFit(LidarSegmentation& seg) {
 	s.x2 = x2;
 	s.m = (y2-y1)/(x2-x1);
 	s.b = -s.m*x1+y1;
+	//If there's
 	segmentList[numSegments] = s;
 	++numSegments;
 }
@@ -148,21 +148,28 @@ void Map::logGridEdit(int x, int y, int prob) {
 	occGridEdit.Log();
 }
 
-void Map::initLocalGrid(int x, int y) {
-	x_localoffset = nav.getX()+(x*GRID_SIDE_LEN);
-	y_localoffset = nav.getY()+(y*GRID_SIDE_LEN);
-	head_localoffset = getHeading();
-	carX = x;
-	carY = y;
+void Map::initLocalGrid() {
+	carX = x_offset; //left side of screen
+	carY = y_offset; //vertically centered
+	x_start = nav.getX();
+	y_start = nav.getY();
+	if (OGRIDLOG) {
+		occGridInit.xStart = x_start;
+		occGridInit.yStart = y_start;
+		occGridInit.gridSideLen = GRID_SIDE_LEN;
+		occGridInit.xOffset = x_offset;
+		occGridInit.yOffset = y_offset;
+		occGridInit.Log();
+	}
 	//Initialize grid to .2 probability
 	for (int i = 0; i < GRID_SIZE_X; ++i)
 		for (int j = 0; j < GRID_SIZE_Y; ++j)
 			oGrid[i][j] = 2;
-	//For each lidar hit, set probability = .1 if before hit location, .9 at hit location, and .7 around hit location
+	/*//For each lidar hit, set probability = .1 if before hit location, .9 at hit location, and .7 around hit location
 	for (int i = 0; i < 360; ++i) {
 		int mag = SpinningLidar::dist[i];
-		int dir = Utility::lidarAngleToPolar(i)+getHeading()-head_localoffset;
-		float cosdir = fastcos(dir);
+		int dir = getHeading()-i;
+		float cosdir = fastcos(dir); //fasttrig does zero to 360 degree mapping for us
 		float sindir = fastsin(dir);
 		int hitX = carX+(mag*cosdir/GRID_SIDE_LEN);
 		int hitY = carY+(mag*sindir/GRID_SIDE_LEN);
@@ -198,40 +205,44 @@ void Map::initLocalGrid(int x, int y) {
 			gridX += dX;
 			gridY += dY;
 		}
-	}
+	}*/
 }
 
 void Map::updateOGrid() {
-	carX = (nav.getX()+x_localoffset)/GRID_SIDE_LEN;
-	carY = (nav.getY()+y_localoffset)/GRID_SIDE_LEN;
-	for (int i = 0; i < 360; ++i) {
+	carX = ((nav.getX()-x_start)/GRID_SIDE_LEN)+x_offset;
+	carY = ((nav.getY()-y_start)/GRID_SIDE_LEN)+y_offset;
+	if (carX>GRID_SIZE_X || carX<0 || carY>GRID_SIZE_Y || carY<0) initLocalGrid(); //if car out of bounds, reinitialize grid
+	for (int i = 0; i < 360; i+=2) { //for every other lidar reading
 		int mag = SpinningLidar::dist[i];
-		int dir = Utility::lidarAngleToPolar(i)+getHeading()-head_localoffset;
+		if (mag < 1 || SpinningLidar::sampleQuality[i] < 1) continue; //if lidar reading bad, skip to next lidar reading
+		int dir = getHeading()-i;
 		float cosdir = fastcos(dir);
 		float sindir = fastsin(dir);
 		int hitX = carX+(mag*cosdir/GRID_SIDE_LEN);
 		int hitY = carY+(mag*sindir/GRID_SIDE_LEN);
+		if (hitX>GRID_SIZE_X || hitX<0 || hitY>GRID_SIZE_Y || hitY<0) continue; //if lidar hit out of bounds, skip lidar reading
 		float dX = .5*cosdir;
 		float dY = .5*sindir;
 		float gridX = carX + dX; //move .5 grid units in direction each iteration
 		float gridY = carY + dY;
+		//Set current space to probability .1
+		if (oGrid[carX][carY] > 0) {
+			oGrid[carX][carY] = 1;
+			if (OGRIDLOG) logGridEdit(carX,carY,1);
+		}
 		//Subtract 2 or 4 from spaces before lidar hit depending on how much lidar angle crosses space
 		while (abs(gridX-hitX)>1 && abs(gridY-hitY)>1) {
-			oGrid[(int)gridX][(int)gridY] -= 2;
-			if (OGRIDLOG) logGridEdit(gridX,gridY,oGrid[(int)gridX][(int)gridY]);
-			if (oGrid[(int)gridX][(int)gridY] < 0) {
-				oGrid[(int)gridX][(int)gridY] = 0;
-				if (OGRIDLOG) logGridEdit(gridX,gridY,0);
+			if (oGrid[(int)gridX][(int)gridY] > 1) {
+				oGrid[(int)gridX][(int)gridY] -= 2;
+				if (OGRIDLOG) logGridEdit(gridX,gridY,oGrid[(int)gridX][(int)gridY]);
 			}
 			gridX += dX;
 			gridY += dY;
 		}
 		//Add 3 to actual lidar hit
-		oGrid[hitX][hitY] += 3;
-		if (OGRIDLOG) logGridEdit(gridX,gridY,oGrid[hitX][hitY]);
-		if (oGrid[hitX][hitY] > 10) {
-			oGrid[hitX][hitY] = 10;
-			if (OGRIDLOG) logGridEdit(gridX,gridY,10);
+		if (oGrid[hitX][hitY] < 8) {
+			oGrid[hitX][hitY] += 3;
+			if (OGRIDLOG) logGridEdit(gridX,gridY,oGrid[hitX][hitY]);
 		}
 	}
 }

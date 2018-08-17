@@ -118,11 +118,13 @@ namespace Utility {
 		return .0328084*cm;
 	}
 
-	int lidarAngleToPolar(int lidarAngle) {
-		return degreeWrap(-lidarAngle+90);
+	float Zto360Wrap(float deg) {
+		while (deg < 0) deg += 360;
+		while (deg >= 360) deg -= 360;
+		return deg;
 	}
 
-	float Zto360Wrap(float deg) {
+	int Zto360Wrap(int deg) {
 		while (deg < 0) deg += 360;
 		while (deg >= 360) deg -= 360;
 		return deg;

@@ -18,6 +18,7 @@ namespace Utility {
 	int I2CScan(bool *discovered);
 	float degreeWrap(float deg); //returns a degree val between -180 and 180
 	float Zto360Wrap(float deg);
+	int Zto360Wrap(int deg);
 
 	//Switches: From viewpoint of car, most forward switch is ch3, green button in back is ch0
 	//Left position produces ADC count of 0, middle in 16000s, right in 32000s
@@ -26,8 +27,6 @@ namespace Utility {
 	int switchVal(int ADCCount);
 
 	float cmToFt(float cm);
-
-	int lidarAngleToPolar(int lidarAngle);
 }
 
 

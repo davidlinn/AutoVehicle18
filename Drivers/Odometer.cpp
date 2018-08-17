@@ -10,7 +10,7 @@
 #include <stdio.h>
 #include <basictypes.h>
 #include <sim5441X.h>
-#include "Nav.h"
+#include "../Nav.h"
 
 static volatile uint32_t OdoCount;
 

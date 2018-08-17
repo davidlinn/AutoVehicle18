@@ -13,6 +13,7 @@
  VDDI --------------------- 3.3V
  SDA ----------------------- 29
  SCL ----------------------- 27
+ INT ----------------------- 50
  GND ---------------------- GND
  */
 
@@ -38,14 +39,15 @@
 #include <pin_irq.h>
 #include <math.h>
 #include <SimpleAD.h>
-#include <Boot_Settings.h>
+#include "../Boot_Settings.h"
 #include <system.h>
 #include <pitr_sem.h>
 
 //Includes for autonomous vehicle project
-#include "Utility.h"
-#include "VehDefs.h"
-#include "LCD.h"
+#include "../Utility.h"
+#include "../Profiler.h"
+#include "../VehDefs.h" //replace constants with your own
+#include "LCD.h" //change all references to LCD to a print method
 
 #define SerialDebug 0
 #define CALIBGA 1 //set to 1 to recalibrate gyro and accelerometer
@@ -61,7 +63,6 @@ uint8_t Mmode = 0x06;        // 2 for 8 Hz, 6 for 100 Hz continuous magnetometer
 float aRes, gRes, mRes;      // scale resolutions per LSB for the sensors
   
 // Pin definitions
-//int intPin FAST_USER_VAR = 50;
 volatile bool newData = false;
 bool newMagData = false;
 
@@ -100,11 +101,10 @@ float lin_ax, lin_ay, lin_az;             // linear acceleration (acceleration w
 float q[4] = {1.0f, 0.0f, 0.0f, 0.0f};    // vector to hold quaternion
 float eInt[3] = {0.0f, 0.0f, 0.0f};       // vector to hold integral error for Mahony method
 
-extern MPU9250 imu; //Make sure global imu object gets initialized in main.cpp's init()
+extern MPU9250 imu; //Make sure global imu object gets initialized before calling IMUSetup()
 extern LCD lcd;
 
-void IMUSetup()
-{
+void IMUSetup() {
 	if (whoAmICheck() == -1) return; //Fail initialization if whoAmICheck fails
 	imu.initMPU9250(Ascale,Gscale);
 	// get sensor resolutions, only need to do this once
@@ -112,51 +112,48 @@ void IMUSetup()
 	gRes = imu.getGres(Gscale);
 	mRes = imu.getMres(Mscale);
 	if (CALIBGA) CalibAccAndGyro();
-  imu.initMPU9250(Ascale,Gscale);
-  printf("\nMPU9250 initialized for active data mode...."); // Initialize device for active mode read of acclerometer, gyroscope, and temperature
-  
-  // Read the WHO_AM_I register of the magnetometer, this is a good test of communication
-  BYTE d = imu.readByte(AK8963_ADDRESS, 0x00);  // Read WHO_AM_I register for AK8963
-  printf("\nAK8963 "); printf("I AM "); printf("%x",d); printf(" I should be "); printf("0x48");
-  OSTimeDly(TICKS_PER_SECOND);
-  
-  // Get magnetometer calibration from AK8963 ROM
-  imu.initAK8963(Mscale,Mmode,magCalibration); printf("\nAK8963 initialized for active data mode...."); // Initialize device for active mode read of magnetometer
-  StartAD();
-  while (!ADDone())
-	  OSTimeDly(1);
-  int recalibMag = (Utility::switchVal(GetADResult(0))==-1); //1 if green button depressed, 0 if not
-  if (recalibMag || NV_Settings.magScale[0]==0) { //if recalib mag button set or mag calib is 0
-	  lcd.clear();
-	  lcd.print("Recalib Mag...");
-	  imu.magcalMPU9250(magBias, magScale);
+	imu.initMPU9250(Ascale,Gscale);
+	printf("\nMPU9250 initialized for active data mode...."); // Initialize device for active mode read of acclerometer, gyroscope, and temperature
 
-	  //Save calibration to boot memory
-	  for (int i = 0; i < 3; ++i)
-		  NV_Settings.magBias[i] = magBias[i];
-	  for (int i = 0; i < 3; ++i)
-		  NV_Settings.magScale[i] = magScale[i];
-	  SaveUserParameters(&NV_Settings, sizeof(NV_Settings));
+	// Read the WHO_AM_I register of the magnetometer, this is a good test of communication
+	BYTE d = imu.readByte(AK8963_ADDRESS, 0x00);  // Read WHO_AM_I register for AK8963
+	printf("\nAK8963 "); printf("I AM "); printf("%x",d); printf(" I should be "); printf("0x48");
+	OSTimeDly(TICKS_PER_SECOND);
+  
+	// Get magnetometer calibration from AK8963 ROM
+	imu.initAK8963(Mscale,Mmode,magCalibration); printf("\nAK8963 initialized for active data mode...."); // Initialize device for active mode read of magnetometer
+	StartAD();
+	while (!ADDone()) OSTimeDly(1);
+	int recalibMag = (Utility::switchVal(GetADResult(0))==-1); //1 if green button depressed, 0 if not
+	if (recalibMag || NV_Settings.magScale[0]==0) { //if recalib mag button set or mag calib is 0
+		lcd.clear();
+		lcd.print("Recalib Mag...");
+		imu.magcalMPU9250(magBias, magScale);
 
-	  lcd.clear();
-  }
-  else {
-	  //Load calibration from boot memory
-	  for (int i = 0; i < 3; ++i)
-		  magBias[i]=NV_Settings.magBias[i];
-	  for (int i = 0; i < 3; ++i)
-		  magScale[i]=NV_Settings.magScale[i];
-  }
-  //Print Mag Calibration
-  printf("\nAK8963 mag biases (mG)"); printf(" %f",magBias[0]); printf(" %f",magBias[1]); printf(" %f",magBias[2]);
-  printf("\nAK8963 mag scale (mG)"); printf(" %f",magScale[0]); printf(" %f",magScale[1]); printf(" %f",magScale[2]);
-  OSTimeDly(TICKS_PER_SECOND); // add delay to see results before serial spew of data
-  if(SerialDebug) {
-	  printf("\nX-Axis sensitivity adjustment value "); printf("%f",magCalibration[0]);
-	  printf("\nY-Axis sensitivity adjustment value "); printf("%f",magCalibration[1]);
-	  printf("\nZ-Axis sensitivity adjustment value "); printf("%f\n",magCalibration[2]);
-	  OSTimeDly(TICKS_PER_SECOND);
-  }
+		//Save calibration to boot memory
+		for (int i = 0; i < 3; ++i)
+			NV_Settings.magBias[i] = magBias[i];
+		for (int i = 0; i < 3; ++i)
+			NV_Settings.magScale[i] = magScale[i];
+		SaveUserParameters(&NV_Settings, sizeof(NV_Settings));
+		lcd.clear();
+	}
+	else {
+		//Load calibration from boot memory
+		for (int i = 0; i < 3; ++i)
+			magBias[i]=NV_Settings.magBias[i];
+		for (int i = 0; i < 3; ++i)
+			magScale[i]=NV_Settings.magScale[i];
+	}
+	//Print Mag Calibration
+	printf("\nAK8963 mag biases (mG)"); printf(" %f",magBias[0]); printf(" %f",magBias[1]); printf(" %f",magBias[2]);
+	printf("\nAK8963 mag scale (mG)"); printf(" %f",magScale[0]); printf(" %f",magScale[1]); printf(" %f",magScale[2]);
+	if(SerialDebug) {
+		printf("\nX-Axis sensitivity adjustment value "); printf("%f",magCalibration[0]);
+		printf("\nY-Axis sensitivity adjustment value "); printf("%f",magCalibration[1]);
+		printf("\nZ-Axis sensitivity adjustment value "); printf("%f\n",magCalibration[2]);
+		OSTimeDly(TICKS_PER_SECOND);
+	}
 }
 
 void CalibAccAndGyro() {
@@ -182,7 +179,7 @@ void IMUSampleLoop(void*) {
 	while (1) {
 		IMUSem.Pend(); //Wait for a call to PirqSem.Post()
 		//printf("Running IMU loop, sum: %f\n",sum);
-		//Profiler::tic(5);
+		Profiler::tic(2);
 		// If we get here, interrupt pin just went high because there was new data to be read
 		imu.readMPU9250Data(MPU9250Data); // interrupt cleared (goes low) on any read
 		//   readAccelData(accelCount);  // Read the x/y/z adc values
@@ -230,37 +227,14 @@ void IMUSampleLoop(void*) {
 		// Serial print and/or display at 0.5 s rate independent of data rates
 		if (sum > .5) { // update LCD once per half-second independent of read rate
 			if (SerialDebug) {
-				printf("\ngRes = %f", gRes);
-				printf("\nax = ");
-				printf("%f", (int) 1000 * ax);
-				printf(" ay = ");
-				printf("%f", (int) 1000 * ay);
-				printf(" az = ");
-				printf("%f", (int) 1000 * az);
-				printf(" mg");
-				printf("\ngx = ");
-				printf("%f", gx);
-				printf(" gy = ");
-				printf("%f", gy);
-				printf(" gz = ");
-				printf("%f", gz);
-				printf(" deg/s");
-				printf("\nmx = ");
-				printf("%i", (int) mx);
-				printf(" my = ");
-				printf("%i", (int) my);
-				printf(" mz = ");
-				printf("%i", (int) mz);
-				printf(" mG");
-
-				printf("\nq0 = ");
-				printf("%f", q[0]);
-				printf(" qx = ");
-				printf("%f", q[1]);
-				printf(" qy = ");
-				printf("%f", q[2]);
-				printf(" qz = ");
-				printf("%f", q[3]);
+				printf("\ngRes = %f", gRes); printf("\nax = "); printf("%f", (int) 1000 * ax); printf(" ay = ");
+				printf("%f", (int) 1000 * ay); printf(" az = "); printf("%f", (int) 1000 * az); printf(" mg");
+				printf("\ngx = "); printf("%f", gx); printf(" gy = "); printf("%f", gy);
+				printf(" gz = "); printf("%f", gz); printf(" deg/s");
+				printf("\nmx = "); printf("%i", (int) mx); printf(" my = "); printf("%i", (int) my);
+				printf(" mz = "); printf("%i", (int) mz); printf(" mG");
+				printf("\nq0 = ");printf("%f", q[0]);printf(" qx = ");printf("%f", q[1]);printf(" qy = ");
+				printf("%f", q[2]);printf(" qz = ");printf("%f", q[3]);
 			}
 			//tempCount = imu.readTempData();  // Read the gyro adc values
 			//temperature = ((float) tempCount) / 333.87 + 21.0; // Gyro chip temperature in degrees Centigrade
@@ -298,7 +272,6 @@ void IMUSampleLoop(void*) {
 			if (SerialDebug) {
 				printf("\nYaw, Pitch, Roll: %f, %f, %f", yaw, pitch, roll);
 				printf("\nHeading: %f", heading);
-
 				printf("\nGrav_x, Grav_y, Grav_z: %f, %f, %f mg", -a31 * 1000,
 						-a32 * 1000, a33 * 1000);
 				printf("\nLin_ax, Lin_ay, Lin_az: %f, %f, %f mg", lin_ax * 1000,
@@ -322,9 +295,7 @@ void IMUSampleLoop(void*) {
 			sumCount = 0; //incremented each filter update, reset here every half-second or so
 			sum = 0; //sum of time intervals between filter updates, reset here every half-second or so
 		}
-		//Profiler::toc(5);
-		//delay 5ms to provide time for other tasks
-		//delaytimer->delay(.005);
+		Profiler::toc(2);
 	}
 }
 
@@ -368,9 +339,6 @@ int whoAmICheck() { //Returns 0 for successful initialization, -1 for fail
 
 void IMURun() {
     OSSimpleTaskCreatewNameSRAM(IMUSampleLoop,IMU_PRIO,"IMU");
-	//SetPinIrq(50, 1,Pirq);
-	//Pins[50].function(PIN_50_IRQ2); //IRQ for IMU
-    //PirqSem.Post();
 }
 
 float getHeading() {
@@ -378,7 +346,6 @@ float getHeading() {
 }
 
 void zeroHeading() {
-	printf("Called zeroHeading()\n");
 	zeroOffset = heading;
 }
 
