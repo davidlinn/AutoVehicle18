@@ -130,6 +130,7 @@ void LCDUpdate(void*) {
 		if (!nav.isFinished())
 			sprintf(buf,"x:%3.1f,y:%3.1f,h:%3.1f,h_des:%3.1f",nav.getX()/1000.,nav.getY()/1000.,getHeading(),nav.getHeadDes());
 		else sprintf(buf,":) x:%3.1f,y:%3.1f,h:%3.1f",nav.getX()/1000.,nav.getY()/1000.,getHeading());
+		//sprintf(buf,"90:%i,%i;270:%i,%i",SpinningLidar::dist[90],getRightLidar(),SpinningLidar::dist[270],getLeftLidar());
 		lcd.print(buf,32);
 		StartAD(); //Updates analog to digital converter so other functions can read switches
 		//printf("\nSpLidar[0]:%i,Heading:%f,Right Lidar Val:%i,GlobalTimerTime:%f\n",SpinningLidar::dist[0],getHeading(),getRightLidar(),getGlobalTime());
@@ -157,6 +158,7 @@ void LCDUpdate(void*) {
 
 void Drive(void*) {
 	while (1) {
+		Profiler::tic(1);
 		if (Utility::mode()==1) { //Fully manual
 			SetServoPos(0,HiCon(rc_ch[1])); //Steer
 			SetServoRaw(1,rc_ch[2]); //Throttle
@@ -173,7 +175,10 @@ void Drive(void*) {
 		if (switch3 == -1) nav.navMethod = Nav::NavMethod::simpleWaypoint;
 		else if (switch3 == 0) nav.navMethod = Nav::NavMethod::followRightWall;
 		else nav.navMethod = Nav::NavMethod::followPath;
+		Profiler::tic(2);
 		nav.navUpdate();
+		Profiler::toc(2);
+		Profiler::toc(1);
 		OSTimeDly(TICKS_PER_SECOND/10);
 	}
 }
@@ -214,16 +219,10 @@ void UserMain(void * pd) {
     SpinningLidar::SpinningLidarInit(); //start top LIDAR serial read and processing task
 
     //Profiling
-    /*OSTimeDly(TICKS_PER_SECOND*10);
-    Profiler::start(getGlobalTime);
-	OSTimeDly(15*TICKS_PER_SECOND);
-	Profiler::stop();
-	printf("\nLidarSegs\n");
-	for (int i = 0; i < map.numLidarSegs; ++i)
-		printf("%i,%i\n",map.lidarseglist[i].startingDegree,map.lidarseglist[i].endingDegree);
-	printf("\nSegments\n");
-	for (int i = 0; i < map.numSegments; ++i)
-		printf("m:%f,b:%f",map.segmentList[i].m,map.segmentList[i].b);*/
+    //OSTimeDly(TICKS_PER_SECOND*10);
+    //Profiler::start(getGlobalTime);
+	//OSTimeDly(15*TICKS_PER_SECOND);
+	//Profiler::stop();
 
     while (1) {
     	OSTimeDly(TICKS_PER_SECOND);

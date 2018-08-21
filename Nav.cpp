@@ -23,6 +23,7 @@
 #include "utils.h"
 #include "Profiler.h"
 #include "FastMath.h"
+#include <stdlib.h>
 
 #define K_P_WALLFOLLOW (1./40.)
 #define BRAKE_PWR -.5 //more neg equals more pwr
@@ -87,7 +88,7 @@ void Nav::navUpdate() {
 	//FOR WALL FOLLOWING
 	//Update walls and error in heading if we moved
 	if (mmTraveled > 0) {
-		diff = wallUpdate(); //difference in estimates in mm
+		wallUpdate(); //difference in estimates in mm
 		headError = (180./M_PI)*asin(diff/mmTraveled); //in degrees
 	}
 }
@@ -132,17 +133,21 @@ float Nav::followRightWallSteer() {
 	}
 }
 
-float Nav::wallUpdate() { //updates wall estimates and returns difference between current and previous estimate in mm
-	int d1 = getRightLidar();
-	int d2 = SpinningLidar::dist[90];
-	int d2Quality = SpinningLidar::sampleQuality[90];
+//updates estimates of distance to physical or virtual wall, attempting to filter erroneous wall estimates from other obstacles
+void Nav::wallUpdate() {
+	prevLeftWallEst = leftWallEst;
+	leftWallEst = SpinningLidar::dist[270]; //integrated spinning lidar and solid state lidar measurement that maximizes range and accuracy
+	if (abs(leftWallEst-prevLeftWallEst) > 500) //if difference of more than 50 cm between current and previous measurements
+		badLeftWallEst = true; 				//set the wall estimate to bad
 	prevRightWallEst = rightWallEst;
-	if (d1 > 0) { //if good reading from solid state lidar
-		if (d2 > 0 && d2Quality > 0) rightWallEst = (d1+d2)/2;
-		else rightWallEst = d1;
+	rightWallEst = SpinningLidar::dist[90]; //integrated spinning lidar and solid state lidar measurement that maximizes range and accuracy
+	if (abs(rightWallEst-prevRightWallEst) > 500) //if difference of more than 50 cm between current and previous measurements
+		badRightWallEst = true;				//set the wall estimate to bad
+
+	int maxDist = wallDist/fastcos(40); //change to degree that's acceptable for wall recovery
+	if ((leftWallEst+rightWallEst)>wallDist && (leftWallEst+rightWallEst)<maxDist) { //if sum of wall ests between wallDist and maxDist
+		badLeftWallEst = false; badRightWallEst = false; //recover walls
 	}
-	else rightWallEst = 0;
-	return prevRightWallEst-rightWallEst;
 }
 
 float Nav::followPathSteer() {

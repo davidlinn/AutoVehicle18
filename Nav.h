@@ -35,7 +35,7 @@ public:
 //Steer-related
 	float headingSteer(); //returns steer val
 	float followRightWallSteer(); //returns steer val
-	float wallUpdate(); //updates wall estimates and returns difference between ests in ft
+	void wallUpdate(); //updates wall estimates, pass in knowledge of total distance between walls if any
 	float followPathSteer(); //returns steer val
 	float aStarSteer(); //returns steer val
 	void greedyHeadDesAdjust(); //if necessary, adds an intermediate waypoint to steer around an obstacle, updates waypoints and heading_des
@@ -102,12 +102,17 @@ private:
 	bool obstacleInPath = false;
 	int rightWallEst; //in mm
 	int prevRightWallEst;
+	bool badRightWallEst = false;
+	int leftWallEst; //in mm
+	int prevLeftWallEst;
+	bool badLeftWallEst = false;
 	int diff;
 	float K_P_STEER = .02;
 	int concernLvl = 4;
 	int circleOfConcern[CIR_CONCERN_SIZE]; //holds lidar readings 0,359,1,358,2,etc. Size is biggest circle of concern
 	float throttleStack[5]; //holds future throttle values; if throttleStackIndex != -1, throttleStack[throttleStackIndex] gets returned
 	int throttleStackSize = 0;
+	int wallDist = 16000;
 };
 
 #endif /* NAV_H_ */

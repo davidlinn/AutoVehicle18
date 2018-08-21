@@ -179,7 +179,7 @@ void IMUSampleLoop(void*) {
 	while (1) {
 		IMUSem.Pend(); //Wait for a call to PirqSem.Post()
 		//printf("Running IMU loop, sum: %f\n",sum);
-		Profiler::tic(2);
+		Profiler::tic(0);
 		// If we get here, interrupt pin just went high because there was new data to be read
 		imu.readMPU9250Data(MPU9250Data); // interrupt cleared (goes low) on any read
 		//   readAccelData(accelCount);  // Read the x/y/z adc values
@@ -295,7 +295,7 @@ void IMUSampleLoop(void*) {
 			sumCount = 0; //incremented each filter update, reset here every half-second or so
 			sum = 0; //sum of time intervals between filter updates, reset here every half-second or so
 		}
-		Profiler::toc(2);
+		Profiler::toc(0);
 	}
 }
 

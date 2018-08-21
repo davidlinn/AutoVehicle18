@@ -17,6 +17,7 @@
 #include <math.h>
 #include "../Profiler.h"
 #include <pitr_sem.h>
+#include "LidarPWM.h"
 
 namespace SpinningLidar {
 	//Global members
@@ -147,6 +148,17 @@ namespace SpinningLidar {
 			for (int j = 0; j < rv; ++j) {
 				processChar(fds,lidar_buffer[j]);
 			}
+			//Increase range of left and right measurements by integrating solid state lidar.
+			//Solid state lidar has much greater error (+-1%) than spinning lidar (+-25mm)
+			//at low distances
+			if (dist[90] < 1 && dist[90] > 4000)
+				dist[90] = getRightLidar(); //replace
+			else if (dist[90] > 3000 && dist[90] < 4000)
+				dist[90] = (dist[90]+getRightLidar())/2; //average
+			if (dist[270] < 1 && dist[270] > 4000)
+				dist[270] = getLeftLidar(); //replace
+			else if (dist[270] > 3000 && dist[270] < 4000)
+				dist[270] = (dist[270]+getLeftLidar())/2; //average
 		}
 	}
 }//end namespace
