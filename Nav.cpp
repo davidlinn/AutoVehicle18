@@ -25,9 +25,10 @@
 #include "FastMath.h"
 #include <stdlib.h>
 
-#define K_P_WALLFOLLOW (1./40.)
+#define K_P_WALLFOLLOW .01
 #define BRAKE_PWR -.5 //more neg equals more pwr
-#define WAYPOINT_SUCCESS_RADIUS_SQ 250000 //50 cm
+#define WAYPOINT_SUCCESS_RADIUS_SQ 250000 //r=50 cm
+#define CHECKPOINT_SUCCESS_RADIUS_SQ 72250000 //r=8.5 m
 
 extern Odometer odo;
 extern Map map;
@@ -49,8 +50,13 @@ void Nav::navUpdate() {
 	//The following lines assume that the ADC is updated every so often by calling StartAD(): we do it in LCDUpdate()
 	if (Utility::switchVal(GetADResult(1))==-1) { //if first switch is in the left position
 		x = 0; y = 0; //reset coordinates
-		rightWallEst = getRightLidar();
+		rightWallEst = SpinningLidar::dist[90];
 		prevRightWallEst = rightWallEst; //reset walls
+		leftWallEst = SpinningLidar::dist[270];
+		prevLeftWallEst = leftWallEst;
+		badLeftWallEst = false;
+		badRightWallEst = false;
+		wallDist=leftWallEst+rightWallEst;
 		finished = false; //not finished
 		return;
 	}
@@ -80,35 +86,79 @@ void Nav::navUpdate() {
 	//Save current heading and odometer
 	lastHeading = getHeading();
 	lastOdo = odo.getCount();
+	//Check if reached high prio waypoints and low prio checkpts
+	wayptUpdate();
+	checkptUpdate();
+	if (finished) return; //Don't do computationally intensive navigation if finished
+	//Update distance to parallel left and right walls
+	wallUpdate();
 	//Calculate desired heading simply before adding heading adjustment algorithms
-	heading_des = (180./M_PI)*atan2(y_des-y,x_des-x);
-	//Greedy Heading Algorithm
-	cocHDesAdjust();
-
-	//FOR WALL FOLLOWING
-	//Update walls and error in heading if we moved
-	if (mmTraveled > 0) {
-		wallUpdate(); //difference in estimates in mm
-		headError = (180./M_PI)*asin(diff/mmTraveled); //in degrees
+	if (navMethod == simpleWaypoint) {
+		if (numWaypts==0) {
+			finished = 1;
+			brakeAndZero(BRAKE_PWR,.5,.5); //brake for .5s, zero for .5s
+		}
+		else heading_des = (180./M_PI)*atan2(y_des-y,x_des-x);
 	}
+	else if (navMethod == followWalls) {
+		if (badRightWallEst && badLeftWallEst) {
+			finished = 1;
+			brakeAndZero(BRAKE_PWR,.2,.2); //brake for .2s, zero for .2s
+		}
+		else if (badRightWallEst) { //leftWallEst is good
+			if (mmTraveled!=0)
+				headingWrtWall = (180./M_PI)*asin(((float)(prevLeftWallEst-leftWallEst))/mmTraveled); //angle with respect to left wall
+			float wallError = leftWallEst-leftWallDist_des; //negative=too close to left wall, positive=too far from left wall
+			float headingWrtWall_des = K_P_WALLFOLLOW*wallError;
+			if (headingWrtWall_des>20) headingWrtWall_des = 20; //cap trajectory with respect to walls at 20 degrees
+			if (headingWrtWall_des<-20) headingWrtWall_des = -20;
+			heading_des = lastHeading-headingWrtWall+headingWrtWall_des;
+		}
+		else if (badLeftWallEst) { //rightWallEst is good
+			if (mmTraveled!=0)
+				headingWrtWall_r = (180./M_PI)*asin(((float)(rightWallEst-prevRightWallEst))/mmTraveled); //angle with respect to right wall
+			float wallError = (wallDist-leftWallDist_des)-rightWallEst; //rightWallDist_des is total wall dist minus leftWallDist_des
+			float headingWrtWall_des = K_P_WALLFOLLOW*wallError;
+			if (headingWrtWall_des>20) headingWrtWall_des = 20; //cap trajectory with respect to walls at 20 degrees
+			if (headingWrtWall_des<-20) headingWrtWall_des = -20;
+			heading_des = Utility::degreeWrap(lastHeading-headingWrtWall_r+headingWrtWall_des);
+		}
+		else { //both walls good
+			//Calculate left wall heading_des
+			if (mmTraveled!=0) {
+				headingWrtWall = (180./M_PI)*asin(((float)(prevLeftWallEst-leftWallEst))/mmTraveled); //angle with respect to left wall
+				headingWrtWall_r = (180./M_PI)*asin(((float)(rightWallEst-prevRightWallEst))/mmTraveled); //angle with respect to right wall
+			}
+			float wallError = leftWallEst-leftWallDist_des; //negative=too close to left wall, positive=too far from left wall
+			float headingWrtWall_des = K_P_WALLFOLLOW*wallError;
+			if (headingWrtWall_des>20) headingWrtWall_des = 20; //cap trajectory with respect to walls at 20 degrees
+			if (headingWrtWall_des<-20) headingWrtWall_des = -20;
+			heading_des = lastHeading-headingWrtWall+headingWrtWall_des;
+			printf("Left:\nheadingWrtWall:%f,wallError:%f,headingWrtWall_des:%f,h_des:%f\n",headingWrtWall,wallError,headingWrtWall_des,heading_des);
+			//Calculate right wall heading_des
+			wallError = (wallDist-leftWallDist_des)-rightWallEst; //rightWallDist_des is total wall dist minus leftWallDist_des
+			headingWrtWall_des = K_P_WALLFOLLOW*wallError;
+			if (headingWrtWall_des>20) headingWrtWall_des = 20; //cap trajectory with respect to walls at 20 degrees
+			if (headingWrtWall_des<-20) headingWrtWall_des = -20;
+			float heading_des_r = (lastHeading-headingWrtWall+headingWrtWall_des);
+			printf("Right:\nheadingWrtWall:%f,wallError:%f,headingWrtWall_des:%f,h_des:%f\n",headingWrtWall_r,wallError,headingWrtWall_des,heading_des_r);
+			//Average headings
+			heading_des = Utility::degreeWrap((heading_des+heading_des_r)/2);
+		}
+	}
+	else { //Competition mode
+
+	}
+	//Adjust h_des with Circles of Concern Obstacle Avoidance Algorithm
+	cocHDesAdjust();
 }
 
 float Nav::getSteer() { //1 left, -1 right. getSteer() must also provide a value for forward
-	switch (navMethod) {
-	case simpleWaypoint: return headingSteer();
-	case followRightWall: return followRightWallSteer();
-	case followPath: return followPathSteer();
-	}
-	return 0;
+	return headingSteer();
 }
 
 float Nav::getThrottle() {
-	switch (navMethod) {
-	case simpleWaypoint: return moveUntilFinished(.145,-.5);
-	case followRightWall: return moveUntilFinished(.145,-.5);
-	case followPath: return moveUntilFinished(.145,-.5);
-	}
-	return 0;
+	return moveUntilFinished(-.5);
 }
 
 //STEERING-RELATED METHODS
@@ -121,16 +171,6 @@ float Nav::headingSteer() {
 	}
 	else forward = 1;
 	return forward*K_P_STEER*error;
-}
-
-float Nav::followRightWallSteer() {
-	forward = 1;
-	if (rightWallEst>300 && fabs(diff) < 300 && !finished) //if estimate is not wildly different from previous
-		return K_P_WALLFOLLOW*headError;
-	else {
-		finished = 1;
-		return 0;
-	}
 }
 
 //updates estimates of distance to physical or virtual wall, attempting to filter erroneous wall estimates from other obstacles
@@ -214,12 +254,11 @@ void Nav::cocHDesAdjust() {
 
 //THROTTLE-RELATED METHODS
 
-float Nav::moveUntilFinished(float throttle, float brake) {
+float Nav::moveUntilFinished(float brake) {
 	//When assigning power, note that backwards needs more power than forwards
 	if (!finished) {
 		if (getServoPos(1)>.01 && forward==-1) //switch directions from forward to backward
 			brakeAndZero(brake, .3, .3); //brake for .3s, zero for .3s to allow speed controller to accept a reverse signal
-		if (waypointFinishCheck(brake)) return 0;
 		else {
 			if (throttleStackSize > 0) { //always return from the stack if there's anything on there
 				return forward*throttleStack[--throttleStackSize]-.035;
@@ -250,25 +289,24 @@ float Nav::moveUntilFinished(float throttle, float brake) {
 	return 0;
 }
 
-int Nav::waypointFinishCheck(float brake) {
+void Nav::wayptUpdate() {
 	int errorsq = (x-x_des)*(x-x_des) + (y-y_des)*(y-y_des); //won't be negative
 	if (errorsq < WAYPOINT_SUCCESS_RADIUS_SQ) {
-		if (numWaypts == 0) { //if no more waypoints on the stack
-			finished = true;
-			if (getServoPos(1)>.01 && (forward==1)) {
-				SetServoPos(1,brake); //brake for .33 secs (only works if moving forward)
-				OSTimeDly(TICKS_PER_SECOND/3);
-			}
-			SetServoPos(1,0); //Reset throttle to zero
-			return 1;
-		}
-		else { //else pop a waypoint off the stack
-			--numWaypts;
+		if (numWaypts > 0) {
+			--numWaypts;	//pop a waypoint off the stack
 			x_des = x_des_stack[numWaypts];
 			y_des = y_des_stack[numWaypts];
 		}
 	}
-	return 0;
+}
+
+void Nav::checkptUpdate() {
+	int errorsq = (x-x_checkpt)*(x-x_checkpt) + (y-y_checkpt)*(y-y_checkpt); //won't be negative
+	if (errorsq < CHECKPOINT_SUCCESS_RADIUS_SQ && numCheckpts != 0) {
+		--numCheckpts;		//pop a waypoint off the stack
+		x_checkpt = x_checkpt_stack[numCheckpts];
+		y_checkpt = y_checkpt_stack[numCheckpts];
+	}
 }
 
 void Nav::brakeAndZero(float brake, float brakeSecs, float zeroSecs) {

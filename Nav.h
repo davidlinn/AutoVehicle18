@@ -11,7 +11,6 @@
 #include <basictypes.h>
 #include <HiResTimer.h>
 #include "VehDefs.h"
-#include "Path.h"
 #include "Map.h"
 
 #define CIR_CONCERN_SIZE 23
@@ -40,11 +39,10 @@ public:
 	float aStarSteer(); //returns steer val
 	void greedyHeadDesAdjust(); //if necessary, adds an intermediate waypoint to steer around an obstacle, updates waypoints and heading_des
 //Throttle-related
-	float moveUntilFinished(float throttle, float brake); //returns steer val
+	float moveUntilFinished(float brake); //returns steer val
 	void brakeAndZero(float brake, float brakeSecs, float zeroSecs); //applies brake for .5s and then zeros throttle, only call if car is moving forward!
-	int waypointFinishCheck(float brake); //returns 1 if finished with waypoint navigation, 0 otherwise
 //Algorithms
-	Path shortestPath(int x, int y); //returns the shortest path to a waypoint using A*
+	//Path shortestPath(int x, int y); //returns the shortest path to a waypoint using A*
 		//returns the heading that follows path of least potential
 	float artificialPotentialWithMap(); //using map
 	float artificialPotential(); //using one lidar scan
@@ -57,20 +55,25 @@ public:
 	//Returns the heading that corresponds to the free sector of arc size 2*halfArc degrees and radius r closest to startingDegree.
 	//If no sector found within 90 degrees, returns startingDegree flipped 180 degrees
 	int closestFreeSector(int startingDegree, int halfArc, int r);
-
 //State
+	void checkptUpdate(); //checks if we've reached current high prio waypt, pops waypt off stack if so
+	void wayptUpdate(); //checks if we've reached current low prio checkpt, pops checkpt off stack if so
 	enum NavMethod {
-		simpleWaypoint, //navigates to a waypoint by minimizing error between heading and heading_des
-		followRightWall, //follows wall by minimizing the change in distance from it, stops when wall ends
+		simpleWaypoint, //navigates to a waypoint by minimizing error between heading and heading_des, heading_des set with trig and
+						//adjusted with Circles of Concern obstacle avoidance algorithm
+		//followRightWall, //follows wall by minimizing the change in distance from it, stops when wall ends
 		//followLeftWall,
-		//followWalls,
+		followWalls, //follows walls until both walls are "bad"
+
+		competition, //navigates from greatest priority to least: A)High prio waypoint, B)Follows walls, C)Low prio checkpoints
+					//heading_des then adjusted with Circles of Concern
 		//createMap, //manual navigation, builds map
 		//rememberPath, //manual navigation, creates a repeatable path by recording coordinates, heading, and throttle/steer vals
-		followPath, //repeats path by minimizing deviance from recorded path while recognizing obstacles
+		//followPath, //repeats path by minimizing deviance from recorded path while recognizing obstacles
 	};
 	NavMethod navMethod;
 
-private:
+
 //Position
 	int x; //estimated X,Y from odometer+IMU readings in MILLIMETERS
 	int y;
@@ -89,13 +92,20 @@ private:
 	float lastHeading;
 	float headError; //for wall following
 //Waypoints, Desired Quantities
-	int x_des = 8000; //current waypoint
-	int y_des = 0;
+	int x_des; //current waypoint
+	int y_des;
 	int x_des_stack[32]; //stack holding future waypoints
 	int y_des_stack[32];
-	unsigned int numWaypts = 0; //number of waypoints on stack, 0 if no waypoints on stack
+	int numWaypts;
+	int x_checkpt; //current waypoint
+	int y_checkpt;
+	int x_checkpt_stack[32]; //stack holding future waypoints
+	int y_checkpt_stack[32];
+	int numCheckpts;
 	float heading_des;
-	Path path;
+	float leftWallDist_des = 500; //50cm from left wall
+	float headingWrtWall; //angle from left wall
+	float headingWrtWall_r; //angle from right wall
 //State
 	bool finished = false;
 	int forward = 1; //1 is forward, -1 is backward
@@ -106,7 +116,6 @@ private:
 	int leftWallEst; //in mm
 	int prevLeftWallEst;
 	bool badLeftWallEst = false;
-	int diff;
 	float K_P_STEER = .02;
 	int concernLvl = 4;
 	int circleOfConcern[CIR_CONCERN_SIZE]; //holds lidar readings 0,359,1,358,2,etc. Size is biggest circle of concern
