@@ -25,7 +25,7 @@
 #include "FastMath.h"
 #include <stdlib.h>
 
-#define K_P_WALLFOLLOW (1./40.)
+#define K_P_WALLFOLLOW .02
 #define BRAKE_PWR -.5 //more neg equals more pwr
 #define WAYPOINT_SUCCESS_RADIUS_SQ 250000 //50 cm
 
@@ -81,22 +81,22 @@ void Nav::navUpdate() {
 	lastHeading = getHeading();
 	lastOdo = odo.getCount();
 	//Calculate desired heading simply before adding heading adjustment algorithms
-	heading_des = (180./M_PI)*atan2(y_des-y,x_des-x);
-	//Greedy Heading Algorithm
-	cocHDesAdjust();
-
+	if (navMethod==simpleWaypoint)
+		heading_des = (180./M_PI)*atan2(y_des-y,x_des-x);
 	//FOR WALL FOLLOWING
 	//Update walls and error in heading if we moved
-	if (mmTraveled > 0) {
-		wallUpdate(); //difference in estimates in mm
-		headError = (180./M_PI)*asin(diff/mmTraveled); //in degrees
+	if (mmTraveled > 0 && navMethod==followRightWall) {
+		wallUpdate();
+		heading_des = lastHeading+(180./M_PI)*asin(((float)diff)/mmTraveled); //in degrees
 	}
+	//Greedy Heading Algorithm
+	cocHDesAdjust();
 }
 
 float Nav::getSteer() { //1 left, -1 right. getSteer() must also provide a value for forward
 	switch (navMethod) {
 	case simpleWaypoint: return headingSteer();
-	case followRightWall: return followRightWallSteer();
+	case followRightWall: return headingSteer();
 	case followPath: return followPathSteer();
 	}
 	return 0;
@@ -125,7 +125,7 @@ float Nav::headingSteer() {
 
 float Nav::followRightWallSteer() {
 	forward = 1;
-	if (rightWallEst>300 && fabs(diff) < 300 && !finished) //if estimate is not wildly different from previous
+	if (rightWallEst>150 && fabs(diff) < 300 && !finished) //if estimate is not wildly different from previous
 		return K_P_WALLFOLLOW*headError;
 	else {
 		finished = 1;
@@ -135,19 +135,9 @@ float Nav::followRightWallSteer() {
 
 //updates estimates of distance to physical or virtual wall, attempting to filter erroneous wall estimates from other obstacles
 void Nav::wallUpdate() {
-	prevLeftWallEst = leftWallEst;
-	leftWallEst = SpinningLidar::dist[270]; //integrated spinning lidar and solid state lidar measurement that maximizes range and accuracy
-	if (abs(leftWallEst-prevLeftWallEst) > 500) //if difference of more than 50 cm between current and previous measurements
-		badLeftWallEst = true; 				//set the wall estimate to bad
 	prevRightWallEst = rightWallEst;
-	rightWallEst = SpinningLidar::dist[90]; //integrated spinning lidar and solid state lidar measurement that maximizes range and accuracy
-	if (abs(rightWallEst-prevRightWallEst) > 500) //if difference of more than 50 cm between current and previous measurements
-		badRightWallEst = true;				//set the wall estimate to bad
-
-	int maxDist = wallDist/fastcos(40); //change to degree that's acceptable for wall recovery
-	if ((leftWallEst+rightWallEst)>wallDist && (leftWallEst+rightWallEst)<maxDist) { //if sum of wall ests between wallDist and maxDist
-		badLeftWallEst = false; badRightWallEst = false; //recover walls
-	}
+	rightWallEst = SpinningLidar::dist[90];
+	diff = prevRightWallEst-rightWallEst; //positive if getting closer to right wall
 }
 
 float Nav::followPathSteer() {

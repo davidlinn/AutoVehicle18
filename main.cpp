@@ -130,7 +130,6 @@ void LCDUpdate(void*) {
 		if (!nav.isFinished())
 			sprintf(buf,"x:%3.1f,y:%3.1f,h:%3.1f,h_des:%3.1f",nav.getX()/1000.,nav.getY()/1000.,getHeading(),nav.getHeadDes());
 		else sprintf(buf,":) x:%3.1f,y:%3.1f,h:%3.1f",nav.getX()/1000.,nav.getY()/1000.,getHeading());
-		//sprintf(buf,"90:%i,%i;270:%i,%i",SpinningLidar::dist[90],getRightLidar(),SpinningLidar::dist[270],getLeftLidar());
 		lcd.print(buf,32);
 		StartAD(); //Updates analog to digital converter so other functions can read switches
 		//printf("\nSpLidar[0]:%i,Heading:%f,Right Lidar Val:%i,GlobalTimerTime:%f\n",SpinningLidar::dist[0],getHeading(),getRightLidar(),getGlobalTime());
@@ -152,7 +151,7 @@ void LCDUpdate(void*) {
 			for (int i = 0; i < map.numCircles; ++i)
 				printf("Circle %i: x=%f,y=%f\n",i,map.circleList[i].x,map.circleList[i].y);
 		}*/
-		OSTimeDly(TICKS_PER_SECOND/2); //run at 3 Hz
+		OSTimeDly(TICKS_PER_SECOND/2); //run at 2 Hz
 	}
 }
 
