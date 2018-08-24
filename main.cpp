@@ -51,7 +51,7 @@ LCD lcd; //LCD object, reinstantiated in init()
 Odometer odo; //Global odometer object, reinstantiated in init()
 MPU9250 imu; //Global imu object, reinstantiated in init()
 Nav nav; //Constructor does nothing
-//Path mainPath;
+Path mainPath;
 Map map;
 NV_SettingsStruct NV_Settings;
 
@@ -172,14 +172,9 @@ void Drive(void*) {
 			SetServoPos(1,nav.getThrottle()); //Throttle
 		}
 		int switch3 = Utility::switchVal(GetADResult(3));
-		if (switch3 == -1) {
-			nav.navMethod = Nav::NavMethod::simpleWaypoint;
-			nav.x_des = 8000;
-			nav.y_des = 0;
-			nav.numWaypts = 1;
-		}
-		else if (switch3 == 0) nav.navMethod = Nav::NavMethod::followWalls;
-		else nav.navMethod = Nav::NavMethod::competition;
+		if (switch3 == -1) nav.navMethod = Nav::NavMethod::simpleWaypoint;
+		else if (switch3 == 0) nav.navMethod = Nav::NavMethod::followRightWall;
+		else nav.navMethod = Nav::NavMethod::followPath;
 		Profiler::tic(2);
 		nav.navUpdate();
 		Profiler::toc(2);
